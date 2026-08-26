@@ -1,58 +1,64 @@
-// Provides retry logic for unreliable network operations
-// Uses exponential backoff with configurable options
-
-export interface NetworkRetryOptions {
-  maxRetries: number;
-  baseDelay: number;
-  maxDelay: number;
-  shouldRetry: (error: Error) => boolean;
+export interface ProcessingItem {
+  id: string;
+  value: unknown;
+  timestamp?: number;
 }
 
-export const defaultNetworkRetryOptions: NetworkRetryOptions = {
-  maxRetries: 3,
-  baseDelay: 1000,
-  maxDelay: 30000,
-  shouldRetry: (error: Error) => {
-    const message = error.message.toLowerCase();
-    return (
-      message.includes('timeout') ||
-      message.includes('network') ||
-      message.includes('connection') ||
-      (error as any).code === 'ECONNRESET' ||
-      (error as any).code === 'ETIMEDOUT'
-    );
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+/**
+ * Validates a single item before processing in the main loop.
+ * Ensures required properties exist and have correct types.
+ */
+export function validateProcessingItem(item: unknown): ValidationResult {
+  const errors: string[] = [];
+
+  if (!item || typeof item !== 'object') {
+    return { isValid: false, errors: ['Item must be a non-null object'] };
   }
-};
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  const candidate = item as Record<string, unknown>;
+
+  if (typeof candidate.id !== 'string' || candidate.id.trim() === '') {
+    errors.push('Property "id" must be a non-empty string');
+  }
+
+  if (candidate.value === undefined || candidate.value === null) {
+    errors.push('Property "value" cannot be null or undefined');
+  }
+
+  if (candidate.timestamp !== undefined && typeof candidate.timestamp !== 'number') {
+    errors.push('Property "timestamp" must be a number when provided');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
 }
 
-export async function retryNetworkCall<T>(
-  fn: () => Promise<T>,
-  options: Partial<NetworkRetryOptions> = {}
-): Promise<T> {
-  const opts: NetworkRetryOptions = {
-    ...defaultNetworkRetryOptions,
-    ...options,
-  };
-  let attempt = 0;
-  let lastError: Error | undefined;
-  while (attempt <= opts.maxRetries) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err as Error;
-      attempt++;
-      if (attempt > opts.maxRetries || !opts.shouldRetry(lastError)) {
-        throw lastError;
-      }
-      const delay = Math.min(
-        opts.baseDelay * Math.pow(2, attempt - 1),
-        opts.maxDelay
-      );
-      await sleep(delay);
+/**
+ * Main processing loop helper that filters invalid items.
+ */
+export function processValidItems<T>(
+  items: unknown[],
+  processor: (item: ProcessingItem) => T
+): { results: T[]; droppedCount: number } {
+  const results: T[] = [];
+  let droppedCount = 0;
+
+  for (const rawItem of items) {
+    const validation = validateProcessingItem(rawItem);
+    
+    if (validation.isValid) {
+      results.push(processor(rawItem as ProcessingItem));
+    } else {
+      droppedCount++;
     }
   }
-  throw lastError!;
+
+  return { results, droppedCount };
 }
