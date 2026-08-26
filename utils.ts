@@ -1,48 +1,51 @@
 /**
- * Deep clones any JSON-serializable data structure.
- * 
- * @template T - The type of the object being cloned
- * @param {T} source - The object to clone
- * @returns {T} A deep copy of the source object
+ * Core performance optimization utilities for dev-toolkit-71.
+ * Provides memoization and efficient batch processing functions.
  */
-export function deepClone<T>(source: T): T {
-  if (source === null || typeof source !== 'object') {
-    return source;
-  }
 
-  if (source instanceof Date) {
-    return new Date(source.getTime()) as unknown as T;
-  }
+export function memoize<TArgs extends unknown[], TResult>(
+  fn: (...args: TArgs) => TResult,
+  resolver?: (...args: TArgs) => string
+): (...args: TArgs) => TResult {
+  const cache = new Map<string, TResult>();
 
-  if (source instanceof Array) {
-    const copy = [] as unknown as T;
-    for (let i = 0; i < source.length; i++) {
-      (copy as unknown as any[])[i] = deepClone(source[i]);
+  return function (...args: TArgs): TResult {
+    const key = resolver ? resolver(...args) : JSON.stringify(args);
+    
+    if (cache.has(key)) {
+      return cache.get(key) as TResult;
     }
-    return copy;
-  }
 
-  if (source instanceof Object) {
-    const copy = {} as unknown as T;
-    for (const key of Object.keys(source)) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        (copy as unknown as Record<string, any>)[key] = deepClone((source as Record<string, any>)[key]);
-      }
-    }
-    return copy;
-  }
-
-  throw new Error('Unable to copy source object; type not supported.');
+    const result = fn(...args);
+    cache.set(key, result);
+    return result;
+  };
 }
 
-/**
- * Safely parses a JSON string with a fallback value.
- */
-export function safeJsonParse<T>(jsonString: string, fallback: T): T {
-  try {
-    const parsed = JSON.parse(jsonString);
-    return parsed !== null ? parsed : fallback;
-  } catch {
-    return fallback;
+export async function batchProcess<T, R>(
+  items: T[],
+  processor: (item: T) => Promise<R>,
+  batchSize: number = 50
+): Promise<R[]> {
+  const results: R[] = [];
+  
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+  }
+
+  return results;
+}
+
+export class PerformanceTimer {
+  private start: number = performance.now();
+
+  public reset(): void {
+    this.start = performance.now();
+  }
+
+  public elapsed(): number {
+    return performance.now() - this.start;
   }
 }
