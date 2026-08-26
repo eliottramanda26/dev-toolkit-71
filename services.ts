@@ -1,80 +1,42 @@
-export interface Config {
-  apiUrl: string;
-  timeout: number;
-  maxRetries: number;
-  logLevel: 'debug' | 'info' | 'warn' | 'error';
+import * as fs from 'fs';
+import * as path from 'path';
+
+export interface LoggerOptions {
+  logDir: string;
+  maxFileSizeMb: number;
 }
 
-const DEFAULT_CONFIG: Config = {
-  apiUrl: 'https://api.example.com',
-  timeout: 5000,
-  maxRetries: 3,
-  logLevel: 'info',
-};
+export class RotatingLogger {
+  private logFilePath: string;
+  private maxBytes: number;
 
-export class ConfigService {
-  private config: Config;
-  constructor(overrides: Partial<Config> = {}) {
-    this.config = this.loadWithDefaults(overrides);
+  constructor(options: LoggerOptions) {
+    this.logFilePath = path.join(options.logDir, 'app.log');
+    this.maxBytes = options.maxFileSizeMb * 1024 * 1024;
+    
+    if (!fs.existsSync(options.logDir)) {
+      fs.mkdirSync(options.logDir, { recursive: true });
+    }
   }
 
-  private loadWithDefaults(overrides: Partial<Config>): Config {
-    // merge defaults with provided overrides to ensure all values are set
-    return {
-      ...DEFAULT_CONFIG,
-      ...overrides,
-    };
+  public log(message: string): void {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${message}\n`;
+
+    this.rotateIfNeeded();
+    fs.appendFileSync(this.logFilePath, logEntry, 'utf8');
   }
 
-  public getConfig(): Config {
-    // return a copy to prevent external mutation
-    return { ...this.config };
+  private rotateIfNeeded(): void {
+    if (!fs.existsSync(this.logFilePath)) {
+      return;
+    }
+
+    const stats = fs.statSync(this.logFilePath);
+    if (stats.size >= this.maxBytes) {
+      const timestamp = Date.now();
+      const rotatedPath = `${this.logFilePath}.${timestamp}`;
+      fs.renameSync(this.logFilePath, rotatedPath);
+    }
   }
-
-  public getApiUrl(): string {
-    return this.config.apiUrl;
-  }
-
-  public getTimeout(): number {
-    return this.config.timeout;
-  }
-
-  public getMaxRetries(): number {
-    return this.config.maxRetries;
-  }
-
-  public getLogLevel(): string {
-    return this.config.logLevel;
-  }
-
-}
-
-export function createConfigLoader(overrides: Partial<Config> = {}): ConfigService {
-  return new ConfigService(overrides);
-}
-
-export function loadConfig(overrides: Partial<Config> = {}): Config {
-  const envOverrides: Partial<Config> = { ...overrides };
-
-  if (process.env.API_URL) {
-    envOverrides.apiUrl = process.env.API_URL;
-  }
-
-  const timeout = process.env.TIMEOUT ? parseInt(process.env.TIMEOUT, 10) : NaN;
-  if (!isNaN(timeout)) {
-    envOverrides.timeout = timeout;
-  }
-
-  const maxRetries = process.env.MAX_RETRIES ? parseInt(process.env.MAX_RETRIES, 10) : NaN;
-  if (!isNaN(maxRetries)) {
-    envOverrides.maxRetries = maxRetries;
-  }
-
-  const logLevel = process.env.LOG_LEVEL;
-  if (logLevel && ['debug', 'info', 'warn', 'error'].includes(logLevel)) {
-    envOverrides.logLevel = logLevel as Config['logLevel'];
-  }
-
-  const service = new ConfigService(envOverrides);
-  return service.getConfig();
 }
