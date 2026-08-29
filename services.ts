@@ -1,42 +1,57 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-export interface LoggerOptions {
-  logDir: string;
-  maxFileSizeMb: number;
+export interface ServiceResponse<T> {
+  data?: T;
+  error?: string;
+  success: boolean;
 }
 
-export class RotatingLogger {
-  private logFilePath: string;
-  private maxBytes: number;
-
-  constructor(options: LoggerOptions) {
-    this.logFilePath = path.join(options.logDir, 'app.log');
-    this.maxBytes = options.maxFileSizeMb * 1024 * 1024;
-    
-    if (!fs.existsSync(options.logDir)) {
-      fs.mkdirSync(options.logDir, { recursive: true });
+export class ServiceHandler {
+  async processRequest(data: any): Promise<ServiceResponse<any>> {
+    if (data === null || data === undefined) {
+      return { success: false, error: 'Input data is required' };
+    }
+    if (typeof data !== 'object') {
+      return { success: false, error: 'Input must be an object' };
+    }
+    try {
+      if (!data.id || typeof data.id !== 'string' || data.id.trim() === '') {
+        throw new Error('ID must be a non-empty string');
+      }
+      if (data.value === undefined) {
+        throw new Error('Value is required');
+      }
+      if (typeof data.value === 'number' && data.value < 0) {
+        throw new Error('Value cannot be negative');
+      }
+      const processed = {
+        id: data.id,
+        value: data.value,
+        processedAt: new Date().toISOString()
+      };
+      return { data: processed, success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      return { success: false, error: message };
     }
   }
 
-  public log(message: string): void {
-    const timestamp = new Date().toISOString();
-    const logEntry = `[${timestamp}] ${message}\n`;
-
-    this.rotateIfNeeded();
-    fs.appendFileSync(this.logFilePath, logEntry, 'utf8');
-  }
-
-  private rotateIfNeeded(): void {
-    if (!fs.existsSync(this.logFilePath)) {
-      return;
+  async batchProcess(items: any[]): Promise<ServiceResponse<any[]>> {
+    if (!Array.isArray(items)) {
+      return { success: false, error: 'Items must be an array' };
     }
-
-    const stats = fs.statSync(this.logFilePath);
-    if (stats.size >= this.maxBytes) {
-      const timestamp = Date.now();
-      const rotatedPath = `${this.logFilePath}.${timestamp}`;
-      fs.renameSync(this.logFilePath, rotatedPath);
+    if (items.length === 0) {
+      return { data: [], success: true };
     }
+    const results: any[] = [];
+    for (const item of items) {
+      try {
+        const result = await this.processRequest(item);
+        if (result.success && result.data) {
+          results.push(result.data);
+        }
+      } catch (error) {
+        console.error('Error processing item:', error);
+      }
+    }
+    return { data: results, success: true };
   }
 }
