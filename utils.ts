@@ -1,51 +1,60 @@
-/**
- * Core performance optimization utilities for dev-toolkit-71.
- * Provides memoization and efficient batch processing functions.
- */
+// Retry logic for network operations with configurable options
 
-export function memoize<TArgs extends unknown[], TResult>(
-  fn: (...args: TArgs) => TResult,
-  resolver?: (...args: TArgs) => string
-): (...args: TArgs) => TResult {
-  const cache = new Map<string, TResult>();
+export interface RetryConfig {
+  maxRetries: number;
+  baseDelay: number;
+  maxDelay: number;
+  factor: number;
+}
 
-  return function (...args: TArgs): TResult {
-    const key = resolver ? resolver(...args) : JSON.stringify(args);
-    
-    if (cache.has(key)) {
-      return cache.get(key) as TResult;
+const defaultConfig: RetryConfig = {
+  maxRetries: 3,
+  baseDelay: 1000,
+  maxDelay: 10000,
+  factor: 2
+};
+
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  config: Partial<RetryConfig> = {}
+): Promise<T> {
+  const finalConfig = { ...defaultConfig, ...config };
+  let lastError: Error | unknown;
+
+  for (let attempt = 0; attempt <= finalConfig.maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt === finalConfig.maxRetries) {
+        break;
+      }
+
+      const delay = Math.min(
+        finalConfig.baseDelay * Math.pow(finalConfig.factor, attempt),
+        finalConfig.maxDelay
+      );
+      
+      // Jitter to avoid synchronized retries
+      const jitteredDelay = delay * (0.5 + Math.random() * 0.5);
+      
+      await sleep(jitteredDelay);
     }
+  }
 
-    const result = fn(...args);
-    cache.set(key, result);
-    return result;
-  };
+  throw lastError;
 }
 
-export async function batchProcess<T, R>(
-  items: T[],
-  processor: (item: T) => Promise<R>,
-  batchSize: number = 50
-): Promise<R[]> {
-  const results: R[] = [];
-  
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    const batchResults = await Promise.all(batch.map(processor));
-    results.push(...batchResults);
-  }
-
-  return results;
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export class PerformanceTimer {
-  private start: number = performance.now();
-
-  public reset(): void {
-    this.start = performance.now();
-  }
-
-  public elapsed(): number {
-    return performance.now() - this.start;
-  }
+// Network specific helper
+export async function retryFetch(
+  url: string | URL | Request,
+  init?: RequestInit,
+  config?: Partial<RetryConfig>
+): Promise<Response> {
+  return withRetry(() => fetch(url, init), config);
 }
