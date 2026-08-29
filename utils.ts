@@ -1,60 +1,69 @@
-// Retry logic for network operations with configurable options
-
-export interface RetryConfig {
-  maxRetries: number;
-  baseDelay: number;
-  maxDelay: number;
-  factor: number;
-}
-
-const defaultConfig: RetryConfig = {
-  maxRetries: 3,
-  baseDelay: 1000,
-  maxDelay: 10000,
-  factor: 2
-};
-
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  config: Partial<RetryConfig> = {}
-): Promise<T> {
-  const finalConfig = { ...defaultConfig, ...config };
-  let lastError: Error | unknown;
-
-  for (let attempt = 0; attempt <= finalConfig.maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-      
-      if (attempt === finalConfig.maxRetries) {
-        break;
-      }
-
-      const delay = Math.min(
-        finalConfig.baseDelay * Math.pow(finalConfig.factor, attempt),
-        finalConfig.maxDelay
-      );
-      
-      // Jitter to avoid synchronized retries
-      const jitteredDelay = delay * (0.5 + Math.random() * 0.5);
-      
-      await sleep(jitteredDelay);
+// Performance optimized utilities for core module
+export function memoize<Args extends any[], Return>(
+  fn: (...args: Args) => Return
+): (...args: Args) => Return {
+  const cache = new Map<string, Return>();
+  return (...args: Args): Return => {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) {
+      return cache.get(key)!;
     }
+    const result = fn(...args);
+    cache.set(key, result);
+    return result;
+  };
+}
+
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => {
+      func(...args);
+    }, wait);
+  };
+}
+
+export function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => void {
+  let lastCall = 0;
+  return (...args: Parameters<T>) => {
+    const now = Date.now();
+    if (now - lastCall >= limit) {
+      lastCall = now;
+      func(...args);
+    }
+  };
+}
+
+export function uniqueWithSet<T>(arr: T[]): T[] {
+  return [...new Set(arr)];
+}
+
+export function batchProcess<T, R>(
+  items: T[],
+  batchSize: number,
+  processor: (batch: T[]) => R[]
+): R[] {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    results.push(...processor(batch));
   }
-
-  throw lastError;
+  return results;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Network specific helper
-export async function retryFetch(
-  url: string | URL | Request,
-  init?: RequestInit,
-  config?: Partial<RetryConfig>
-): Promise<Response> {
-  return withRetry(() => fetch(url, init), config);
-}
+export const computeHeavyTask = memoize((size: number): number => {
+  let total = 0;
+  for (let i = 0; i < size; i++) {
+    total += Math.sqrt(i) * Math.sin(i);
+  }
+  return total;
+});
