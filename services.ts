@@ -1,50 +1,48 @@
-export interface ServiceResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
+// services.ts - Network services with retry logic
+
+interface RetryConfig {
+  maxRetries: number;
+  baseDelay: number;
 }
 
-// Creates a basic service with fetch capabilities
-export function createService(baseUrl: string) {
-  return {
-    async fetchData<T>(path: string): Promise<ServiceResponse<T>> {
-      try {
-        const res = await fetch(`${baseUrl}/${path}`);
-        if (!res.ok) throw new Error(res.statusText);
-        const data = await res.json();
-        return { success: true, data };
-      } catch (err) {
-        return { success: false, error: (err as Error).message };
+/**
+ * Retries a network operation with exponential backoff
+ */
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  config: RetryConfig = { maxRetries: 3, baseDelay: 1000 }
+): Promise<T> {
+  let attempt = 0;
+  let lastError: Error | undefined;
+
+  while (attempt <= config.maxRetries) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      attempt++;
+      if (attempt > config.maxRetries) {
+        break;
       }
+      const delay = config.baseDelay * Math.pow(2, attempt - 1);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
-  };
+  }
+
+  throw lastError ?? new Error('Operation failed after all retries');
 }
 
-// Debounce function to limit rapid calls
-export function debounce<T extends (...args: any[]) => any>(fn: T, delay: number) {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  return (...args: Parameters<T>) => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      fn(...args);
-      timer = null;
-    }, delay);
-  };
-}
-
-// Throttle function to limit execution rate
-export function throttle<T extends (...args: any[]) => any>(fn: T, limit: number) {
-  let inThrottle: boolean;
-  return (...args: Parameters<T>) => {
-    if (!inThrottle) {
-      fn(...args);
-      inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
+// Convenience function for fetch operations
+export async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  config?: RetryConfig
+): Promise<Response> {
+  return withRetry(async () => {
+    const res = await fetch(input, init);
+    if (!res.ok) {
+      throw new Error(`Network response was not ok: ${res.status}`);
     }
-  };
-}
-
-// Formats number as currency string
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+    return res;
+  }, config);
 }
