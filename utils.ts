@@ -1,69 +1,48 @@
-// Performance optimized utilities for core module
-export function memoize<Args extends any[], Return>(
-  fn: (...args: Args) => Return
-): (...args: Args) => Return {
-  const cache = new Map<string, Return>();
-  return (...args: Args): Return => {
-    const key = JSON.stringify(args);
-    if (cache.has(key)) {
-      return cache.get(key)!;
-    }
-    const result = fn(...args);
-    cache.set(key, result);
-    return result;
-  };
-}
-
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  return (...args: Parameters<T>) => {
-    if (timeout !== null) {
-      clearTimeout(timeout);
-    }
-    timeout = setTimeout(() => {
-      func(...args);
-    }, wait);
-  };
-}
-
-export function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): (...args: Parameters<T>) => void {
-  let lastCall = 0;
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - lastCall >= limit) {
-      lastCall = now;
-      func(...args);
-    }
-  };
-}
-
-export function uniqueWithSet<T>(arr: T[]): T[] {
-  return [...new Set(arr)];
-}
-
-export function batchProcess<T, R>(
-  items: T[],
-  batchSize: number,
-  processor: (batch: T[]) => R[]
-): R[] {
-  const results: R[] = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    results.push(...processor(batch));
+// Utility functions for general data handling in TypeScript
+export function safeGet<T = any>(obj: any, path: string, defaultValue?: T): T | undefined {
+  if (!obj || typeof path !== 'string') return defaultValue;
+  const keys = path.split('.');
+  let result: any = obj;
+  for (const key of keys) {
+    if (result == null || typeof result !== 'object') return defaultValue;
+    result = result[key];
   }
-  return results;
+  return result !== undefined ? result : defaultValue;
 }
 
-export const computeHeavyTask = memoize((size: number): number => {
-  let total = 0;
-  for (let i = 0; i < size; i++) {
-    total += Math.sqrt(i) * Math.sin(i);
+export function deepMerge<T extends Record<string, any>>(target: T, ...sources: Partial<T>[]): T {
+  if (sources.length === 0) return target;
+  const source = sources.shift()!;
+  if (isPlainObject(target) && isPlainObject(source)) {
+    for (const key of Object.keys(source)) {
+      const srcVal = source[key];
+      if (isPlainObject(srcVal)) {
+        if (!target[key] || !isPlainObject(target[key])) {
+          (target as any)[key] = {};
+        }
+        deepMerge((target as any)[key], srcVal);
+      } else {
+        (target as any)[key] = srcVal;
+      }
+    }
   }
-  return total;
-});
+  return deepMerge(target, ...sources);
+}
+
+function isPlainObject(value: any): value is Record<string, any> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function omitKeys<T extends Record<string, any>, K extends keyof T>(obj: T, keys: K[]): Omit<T, K> {
+  const result = {...obj};
+  keys.forEach(key => delete result[key]);
+  return result;
+}
+
+export function pickKeys<T extends Record<string, any>, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
+  const result = {} as any;
+  keys.forEach(key => {
+    if (key in obj) result[key] = obj[key];
+  });
+  return result;
+}
