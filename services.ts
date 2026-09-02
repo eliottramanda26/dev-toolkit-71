@@ -1,57 +1,50 @@
 export interface ServiceResponse<T> {
+  success: boolean;
   data?: T;
   error?: string;
-  success: boolean;
 }
 
-export class ServiceHandler {
-  async processRequest(data: any): Promise<ServiceResponse<any>> {
-    if (data === null || data === undefined) {
-      return { success: false, error: 'Input data is required' };
-    }
-    if (typeof data !== 'object') {
-      return { success: false, error: 'Input must be an object' };
-    }
-    try {
-      if (!data.id || typeof data.id !== 'string' || data.id.trim() === '') {
-        throw new Error('ID must be a non-empty string');
-      }
-      if (data.value === undefined) {
-        throw new Error('Value is required');
-      }
-      if (typeof data.value === 'number' && data.value < 0) {
-        throw new Error('Value cannot be negative');
-      }
-      const processed = {
-        id: data.id,
-        value: data.value,
-        processedAt: new Date().toISOString()
-      };
-      return { data: processed, success: true };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error occurred';
-      return { success: false, error: message };
-    }
-  }
-
-  async batchProcess(items: any[]): Promise<ServiceResponse<any[]>> {
-    if (!Array.isArray(items)) {
-      return { success: false, error: 'Items must be an array' };
-    }
-    if (items.length === 0) {
-      return { data: [], success: true };
-    }
-    const results: any[] = [];
-    for (const item of items) {
+// Creates a basic service with fetch capabilities
+export function createService(baseUrl: string) {
+  return {
+    async fetchData<T>(path: string): Promise<ServiceResponse<T>> {
       try {
-        const result = await this.processRequest(item);
-        if (result.success && result.data) {
-          results.push(result.data);
-        }
-      } catch (error) {
-        console.error('Error processing item:', error);
+        const res = await fetch(`${baseUrl}/${path}`);
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+        return { success: true, data };
+      } catch (err) {
+        return { success: false, error: (err as Error).message };
       }
     }
-    return { data: results, success: true };
-  }
+  };
+}
+
+// Debounce function to limit rapid calls
+export function debounce<T extends (...args: any[]) => any>(fn: T, delay: number) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<T>) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      fn(...args);
+      timer = null;
+    }, delay);
+  };
+}
+
+// Throttle function to limit execution rate
+export function throttle<T extends (...args: any[]) => any>(fn: T, limit: number) {
+  let inThrottle: boolean;
+  return (...args: Parameters<T>) => {
+    if (!inThrottle) {
+      fn(...args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}
+
+// Formats number as currency string
+export function formatCurrency(amount: number, currency: string = 'USD'): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
