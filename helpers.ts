@@ -1,59 +1,79 @@
-// Debounce function to limit the rate of function calls
-export function debounce<T extends (...args: any[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  return (...args: Parameters<T>) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => func(...args), delay);
-  };
-}
+/**
+ * Common helper functions for general use
+ */
 
-// Throttle function to ensure function is called at most once per limit
-export function throttle<T extends (...args: any[]) => void>(func: T, limit: number): (...args: Parameters<T>) => void {
-  let inThrottle: boolean = false;
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
   return (...args: Parameters<T>) => {
-    if (!inThrottle) {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => {
       func(...args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
+    }, wait);
+  };
+}
+
+export function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => void {
+  let lastCall = 0;
+  return (...args: Parameters<T>) => {
+    const now = Date.now();
+    if (now - lastCall >= limit) {
+      lastCall = now;
+      func(...args);
     }
   };
 }
 
-// Deep clone for objects and arrays
 export function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== "object") {
+  if (obj === null || typeof obj !== 'object') {
     return obj;
   }
   if (Array.isArray(obj)) {
-    return obj.map((item) => deepClone(item)) as T;
+    return obj.map((item) => deepClone(item)) as unknown as T;
   }
-  const clonedObj: any = {};
+  const clonedObj = {} as T;
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      clonedObj[key] = deepClone((obj as any)[key]);
+      (clonedObj as any)[key] = deepClone((obj as any)[key]);
     }
   }
   return clonedObj;
 }
 
-// Check if value is empty
 export function isEmpty(value: unknown): boolean {
   if (value == null) {
     return true;
   }
-  if (typeof value === "string" || Array.isArray(value)) {
-    return (value as any).length === 0;
+  if (typeof value === 'string' || Array.isArray(value)) {
+    return (value as string | any[]).length === 0;
   }
-  if (typeof value === "object") {
-    return Object.keys(value).length === 0;
+  if (typeof value === 'object') {
+    return Object.keys(value as object).length === 0;
   }
   return false;
 }
 
-// Capitalize first letter of string
 export function capitalize(str: string): string {
-  if (!str || typeof str !== "string") return str;
+  if (!str || typeof str !== 'string') {
+    return str;
+  }
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+export function formatCurrency(amount: number, currency: string = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+  }).format(amount);
+}
+
+export async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
