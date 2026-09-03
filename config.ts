@@ -1,26 +1,33 @@
 export interface AppConfig {
-  version: string;
-  timeout: number;
+  port: number;
+  host: string;
   debug: boolean;
 }
 
-/**
- * Application runtime configuration settings
- */
-export const config: AppConfig = {
-  version: '1.0.0',
-  timeout: 5000,
-  debug: process.env.NODE_ENV !== 'production',
+export const DEFAULT_CONFIG: AppConfig = {
+  port: 3000,
+  host: 'localhost',
+  debug: false,
 };
 
 /**
- * Validation helper for environment variables
+ * Merges partial user config with application defaults
  */
-export function validateConfig(cfg: AppConfig): boolean {
-  return typeof cfg.timeout === 'number' && cfg.timeout > 0;
+export function loadConfig(userConfig: Partial<AppConfig> = {}): AppConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    ...userConfig,
+  };
 }
 
-export const DEFAULTS = Object.freeze({
-  MAX_RETRIES: 3,
-  RETRY_DELAY: 1000,
-});
+/**
+ * Validates that the configuration meets required constraints
+ */
+export function validateConfig(config: AppConfig): void {
+  if (config.port < 1 || config.port > 65535) {
+    throw new Error(`Invalid port number: ${config.port}`);
+  }
+  if (!config.host || config.host.length === 0) {
+    throw new Error('Host must be a non-empty string');
+  }
+}
