@@ -1,43 +1,45 @@
 # dev-toolkit-71
 
-Dev Toolkit 71 is a versatile TypeScript library designed to simplify and enhance development workflows across various projects. With its modular components and intuitive API, developers can efficiently streamline their processes and focus on building great applications.
+A lightweight, high-performance TypeScript utility library designed to streamline common development tasks. It provides a robust set of type-safe helpers to minimize boilerplate code in modern web applications.
 
 ## Features
-- **Modular Utilities**: A rich set of utility functions for string manipulation, array processing, and object handling, promoting reusable code.
-- **TypeScript Integration**: Fully typed interfaces and classes ensure you get the benefits of TypeScript's type safety throughout your development.
-- **Customizable Configuration**: Easily adjust library settings to fit your project requirements with a straightforward configuration setup.
-- **Comprehensive Documentation**: In-depth guides and examples make it easy to integrate and use the toolkit in your own projects.
+
+*   **Type-Safe Object Manipulation:** Advanced utility functions for deep merging, schema validation, and object sanitization without external dependencies.
+*   **Async Flow Control:** Built-in wrappers for batching promises and handling retries with configurable exponential backoff.
+*   **Performance Metrics:** Integrated decorators to track execution time and memory usage of critical functions in development environments.
+*   **String/Date Sanitization:** Pre-configured formatters for ISO 8601 parsing and complex string slugification.
 
 ## Installation
 
-To get started with dev-toolkit-71, you can install it via npm. Run the following command in your project directory:
+Install the package via npm or yarn:
 
 ```bash
 npm install dev-toolkit-71
+# or
+yarn add dev-toolkit-71
 ```
 
-## Basic Usage
+## Usage
 
-Once installed, you can import and use the toolkit's features like so:
+Import the necessary modules directly to leverage tree-shaking and maintain a small bundle size:
 
 ```typescript
-import { stringUtils, arrayUtils } from 'dev-toolkit-71';
+import { batchRetry, deepMerge } from 'dev-toolkit-71';
 
-// Example: String Processing
-const formattedString = stringUtils.capitalize('hello world');
-console.log(formattedString); // Output: "Hello world"
+// Deep merge objects with type safety
+const config = deepMerge(defaultSettings, userSettings);
 
-// Example: Array Handling
-const uniqueArray = arrayUtils.getUnique([1, 2, 2, 3, 4]);
-console.log(uniqueArray); // Output: [1, 2, 3, 4]
+// Execute an async task with built-in retry logic
+const data = await batchRetry(fetchUserData, {
+  attempts: 3,
+  delay: 1000
+});
+
+console.log(data);
 ```
 
 ## License
 
-![MIT License](https://img.shields.io/badge/license-MIT-brightgreen)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
-
----
-
-Explore, contribute, and enhance your coding experience with dev-toolkit-71!
+Distributed under the MIT License. See `LICENSE` for more information.
