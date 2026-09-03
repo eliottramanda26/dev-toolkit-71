@@ -1,79 +1,35 @@
+export interface SafeResult<T> {
+  data: T | null;
+  error: string | null;
+}
+
 /**
- * Common helper functions for general use
+ * safely execute a promise-based operation with error parsing
  */
-
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  return (...args: Parameters<T>) => {
-    if (timeout !== null) {
-      clearTimeout(timeout);
-    }
-    timeout = setTimeout(() => {
-      func(...args);
-    }, wait);
-  };
+export async function safeExecute<T>(fn: () => Promise<T>): Promise<SafeResult<T>> {
+  try {
+    const data = await fn();
+    return { data, error: null };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'unknown error occurred';
+    console.error(`[dev-toolkit-71]: ${message}`);
+    return { data: null, error: message };
+  }
 }
 
-export function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): (...args: Parameters<T>) => void {
-  let lastCall = 0;
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - lastCall >= limit) {
-      lastCall = now;
-      func(...args);
-    }
-  };
+/**
+ * validate input types before execution to prevent runtime crashes
+ */
+export function validateInput<T>(input: T | null | undefined): input is T {
+  if (input === null || input === undefined) {
+    console.warn('[dev-toolkit-71]: invalid input detected');
+    return false;
+  }
+  return true;
 }
 
-export function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map((item) => deepClone(item)) as unknown as T;
-  }
-  const clonedObj = {} as T;
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      (clonedObj as any)[key] = deepClone((obj as any)[key]);
-    }
-  }
-  return clonedObj;
-}
-
-export function isEmpty(value: unknown): boolean {
-  if (value == null) {
-    return true;
-  }
-  if (typeof value === 'string' || Array.isArray(value)) {
-    return (value as string | any[]).length === 0;
-  }
-  if (typeof value === 'object') {
-    return Object.keys(value as object).length === 0;
-  }
-  return false;
-}
-
-export function capitalize(str: string): string {
-  if (!str || typeof str !== 'string') {
-    return str;
-  }
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-}
-
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency,
-  }).format(amount);
-}
-
-export async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export function formatErrorMessage(err: unknown): string {
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message;
+  return 'unexpected runtime exception';
 }
