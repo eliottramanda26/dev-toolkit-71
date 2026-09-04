@@ -1,35 +1,37 @@
-export interface SafeResult<T> {
-  data: T | null;
-  error: string | null;
+export class OperationError extends Error {
+  constructor(public message: string, public code: string, public statusCode: number = 500) {
+    super(message);
+    this.name = 'OperationError';
+  }
 }
 
-/**
- * safely execute a promise-based operation with error parsing
- */
-export async function safeExecute<T>(fn: () => Promise<T>): Promise<SafeResult<T>> {
+export const safeExecute = async <T>(
+  operation: () => Promise<T>,
+  fallback: T
+): Promise<T> => {
   try {
-    const data = await fn();
-    return { data, error: null };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'unknown error occurred';
-    console.error(`[dev-toolkit-71]: ${message}`);
-    return { data: null, error: message };
+    return await operation();
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`[dev-toolkit-71] execution failed: ${error.message}`);
+    } else {
+      console.error('[dev-toolkit-71] unknown error occurred');
+    }
+    return fallback;
   }
-}
+};
 
-/**
- * validate input types before execution to prevent runtime crashes
- */
-export function validateInput<T>(input: T | null | undefined): input is T {
-  if (input === null || input === undefined) {
-    console.warn('[dev-toolkit-71]: invalid input detected');
-    return false;
+export const validateInput = <T>(data: T | null | undefined, name: string): T => {
+  if (data === null || data === undefined) {
+    throw new OperationError(`missing required field: ${name}`, 'INVALID_INPUT', 400);
   }
-  return true;
-}
+  return data;
+};
 
-export function formatErrorMessage(err: unknown): string {
-  if (typeof err === 'string') return err;
-  if (err instanceof Error) return err.message;
-  return 'unexpected runtime exception';
-}
+export const parseJsonSafely = <T>(raw: string, defaultValue: T): T => {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return defaultValue;
+  }
+};
