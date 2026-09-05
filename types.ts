@@ -1,38 +1,34 @@
-// Define a type for user information
-export interface User {
-    id: number;
-    name: string;
-    email: string;
-    isActive: boolean;
+export interface ToolkitConfig {
+  readonly environment: 'development' | 'production';
+  readonly maxRetries: number;
+  readonly timeoutMs: number;
 }
 
-// Define a type for product information
-export interface Product {
-    id: number;
-    title: string;
-    price: number;
-    inStock: boolean;
+export interface ServiceResult<T> {
+  readonly data: T | null;
+  readonly error: string | null;
+  readonly success: boolean;
 }
 
-// Define a type for order information
-export interface Order {
-    orderId: number;
-    userId: number;
-    productIds: number[];
-    totalAmount: number;
+export type LoggerConfig = {
+  readonly level: 'debug' | 'info' | 'warn' | 'error';
+  readonly includeTimestamp: boolean;
+};
+
+export type PluginDefinition = {
+  readonly name: string;
+  readonly version: string;
+  readonly entryPoint: () => Promise<void>;
+};
+
+export interface StateManager<T> {
+  getState(): T;
+  updateState(next: Partial<T>): void;
+  reset(): void;
 }
 
-// Enum for order statuses
-export enum OrderStatus {
-    Pending = 'Pending',
-    Shipped = 'Shipped',
-    Delivered = 'Delivered',
-    Canceled = 'Canceled'
-}
-
-// Type for API response
-export interface ApiResponse<T> {
-    data: T;
-    success: boolean;
-    message?: string;
-}
+export const DEFAULT_CONFIG: ToolkitConfig = {
+  environment: 'development',
+  maxRetries: 3,
+  timeoutMs: 5000,
+};
