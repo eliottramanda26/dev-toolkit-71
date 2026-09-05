@@ -1,29 +1,74 @@
-export interface RetryOptions {
-  maxAttempts: number;
-  delayMs: number;
+/**
+ * Utility functions for general data handling and object manipulation.
+ */
+
+type PlainObject = Record<string, any>;
+
+/**
+ * Checks whether a given value is a plain JavaScript object.
+ */
+function isObject(item: unknown): item is PlainObject {
+  return (
+    item !== null &&
+    typeof item === 'object' &&
+    !Array.isArray(item) &&
+    !(item instanceof Date) &&
+    !(item instanceof RegExp)
+  );
 }
 
 /**
- * Executes a function with a simple exponential backoff retry mechanism
+ * Recursively merges multiple source objects into a target object.
+ *
+ * @param target - The primary object to merge values into
+ * @param sources - Additional source objects to merge
+ * @returns The recursively merged object
  */
-export async function withRetry<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
-): Promise<T> {
-  let lastError: unknown;
+export function deepMerge<T extends PlainObject>(
+  target: T,
+  ...sources: Partial<T>[]
+): T {
+  if (!sources.length) return target;
 
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
-    try {
-      return await operation();
-    } catch (err) {
-      lastError = err;
-      
-      if (attempt < options.maxAttempts) {
-        const backoff = options.delayMs * Math.pow(2, attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, backoff));
+  const source = sources.shift();
+  if (isObject(target) && isObject(source)) {
+    for (const key of Object.keys(source)) {
+      const sourceValue = source[key];
+      const targetValue = target[key];
+
+      if (isObject(sourceValue)) {
+        if (!target[key] || !isObject(targetValue)) {
+          Object.assign(target, { [key]: {} });
+        }
+        deepMerge(target[key], sourceValue);
+      } else if (Array.isArray(sourceValue)) {
+        Object.assign(target, { [key]: [...sourceValue] });
+      } else if (sourceValue !== undefined) {
+        Object.assign(target, { [key]: sourceValue });
       }
     }
   }
 
-  throw lastError;
+  return deepMerge(target, ...sources);
+}
+
+/**
+ * Safely accesses a nested object property using dot-notation path.
+ */
+export function getNestedValue<T = unknown>(
+  obj: PlainObject,
+  path: string,
+  defaultValue?: T
+): T | undefined {
+  const keys = path.split('.');
+  let current: any = obj;
+
+  for (const key of keys) {
+    if (current === null || current === undefined || typeof current !== 'object') {
+      return defaultValue;
+    }
+    current = current[key];
+  }
+
+  return current !== undefined ? (current as T) : defaultValue;
 }
