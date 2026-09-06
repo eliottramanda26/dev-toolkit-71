@@ -1,81 +1,41 @@
-export interface Job {
-  id: string;
-  type: 'transform' | 'analyze' | 'archive';
-  payload: Record<string, unknown>;
+interface RetryOptions {
+  attempts: number;
+  delay: number;
 }
 
-export interface ProcessingResult {
-  successful: string[];
-  failed: { id: string; reason: string }[];
-}
+/**
+ * Executes a function with exponential backoff retry logic
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = { attempts: 3, delay: 1000 }
+): Promise<T> {
+  let lastError: unknown;
 
-export class JobProcessor {
-  /**
-   * Validates a job object to ensure it has all required properties and correct types.
-   */
-  private validateJob(job: any): string | null {
-    if (!job || typeof job !== 'object') {
-      return 'Job must be a non-null object';
-    }
-    if (typeof job.id !== 'string' || job.id.trim() === '') {
-      return 'Invalid or missing job ID';
-    }
-    const allowedTypes = ['transform', 'analyze', 'archive'];
-    if (!allowedTypes.includes(job.type)) {
-      return `Invalid job type. Expected one of: ${allowedTypes.join(', ')}`;
-    }
-    if (!job.payload || typeof job.payload !== 'object') {
-      return 'Job payload must be an object';
-    }
-    return null;
-  }
-
-  /**
-   * Processes a batch of jobs, validating each one before execution.
-   */
-  public processBatch(jobs: unknown[]): ProcessingResult {
-    const successful: string[] = [];
-    const failed: { id: string; reason: string }[] = [];
-
-    if (!Array.isArray(jobs)) {
-      throw new Error('Input batch must be an array of jobs');
-    }
-
-    for (let i = 0; i < jobs.length; i++) {
-      const jobCandidate = jobs[i];
-      const validationError = this.validateJob(jobCandidate);
-
-      if (validationError) {
-        const fallbackId = (jobCandidate && typeof jobCandidate === 'object' && 'id' in jobCandidate) 
-          ? String((jobCandidate as any).id) 
-          : `index-${i}`;
-        
-        failed.push({
-          id: fallbackId,
-          reason: validationError,
-        });
-        continue;
-      }
-
-      const job = jobCandidate as Job;
-
-      try {
-        this.executeJob(job);
-        successful.push(job.id);
-      } catch (error) {
-        failed.push({
-          id: job.id,
-          reason: error instanceof Error ? error.message : 'Unknown processing error',
-        });
+  for (let i = 0; i < options.attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (i < options.attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, options.delay * Math.pow(2, i)));
       }
     }
-
-    return { successful, failed };
   }
 
-  private executeJob(job: Job): void {
-    if (job.type === 'analyze' && !job.payload.metrics) {
-      throw new Error("Missing 'metrics' key in analyze payload");
-    }
-  }
+  throw lastError;
 }
+
+export const fetchWithTimeout = async (url: string, timeout: number = 5000): Promise<Response> => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+};
