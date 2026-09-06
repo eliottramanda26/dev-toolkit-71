@@ -1,41 +1,37 @@
-interface RetryOptions {
-  attempts: number;
-  delay: number;
+export interface ProcessRequest {
+  id: string;
+  payload: unknown;
+  timestamp: number;
 }
+
+export const validateRequest = (req: unknown): req is ProcessRequest => {
+  if (typeof req !== 'object' || req === null) return false;
+  const candidate = req as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.timestamp === 'number' &&
+    candidate.payload !== undefined
+  );
+};
 
 /**
- * Executes a function with exponential backoff retry logic
+ * core loop handler for dev-toolkit-71
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = { attempts: 3, delay: 1000 }
-): Promise<T> {
-  let lastError: unknown;
+export const runProcessingLoop = (data: unknown[]): void => {
+  for (const item of data) {
+    if (!validateRequest(item)) {
+      console.warn('Invalid item skipped during processing:', item);
+      continue;
+    }
 
-  for (let i = 0; i < options.attempts; i++) {
     try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      if (i < options.attempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, options.delay * Math.pow(2, i)));
-      }
+      console.log(`Processing item ${item.id} at ${item.timestamp}`);
+      // process business logic here
+    } catch (error) {
+      console.error(`Execution failure for ${item.id}:`, error);
     }
   }
-
-  throw lastError;
-}
-
-export const fetchWithTimeout = async (url: string, timeout: number = 5000): Promise<Response> => {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(id);
-    return response;
-  } catch (error) {
-    clearTimeout(id);
-    throw error;
-  }
 };
+
+// example usage
+runProcessingLoop([{ id: 'task-01', payload: 'test', timestamp: Date.now() }, null]);
