@@ -1,48 +1,39 @@
+export interface MemoizedConfig {
+  maxSize: number;
+  ttl: number;
+}
+
 /**
- * Deeply merges two objects for configuration and state handling.
- * Returns a new object without mutating inputs.
+ * LRU cache implementation for frequently accessed configuration objects
+ * to minimize object allocation overhead in core processing loops
  */
-export function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
-  const output = { ...target };
+export class MemoizedCache<K, V> {
+  private cache: Map<K, V> = new Map();
+  private readonly maxSize: number;
 
-  for (const key in source) {
-    if (Object.prototype.hasOwnProperty.call(source, key)) {
-      const sourceValue = source[key];
-      const targetValue = target[key];
+  constructor(config: MemoizedConfig) {
+    this.maxSize = config.maxSize;
+  }
 
-      if (sourceValue instanceof Object && targetValue instanceof Object && !Array.isArray(sourceValue)) {
-        output[key] = deepMerge(targetValue, sourceValue);
-      } else {
-        output[key] = sourceValue as any;
-      }
+  public get(key: K): V | undefined {
+    const value = this.cache.get(key);
+    if (value) {
+      // Refresh position for LRU eviction policy
+      this.cache.delete(key);
+      this.cache.set(key, value);
     }
+    return value;
   }
 
-  return output;
-}
-
-/**
- * Safely parses JSON strings with a default fallback value.
- */
-export function safeJsonParse<T>(json: string, fallback: T): T {
-  try {
-    return JSON.parse(json) as T;
-  } catch (error) {
-    console.error('Failed to parse JSON string:', error);
-    return fallback;
+  public set(key: K, value: V): void {
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    this.cache.set(key, value);
   }
-}
 
-/**
- * Simple delay utility for asynchronous flow control.
- */
-export const sleep = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
-
-/**
- * Checks if a value is defined and not null.
- */
-export function isPresent<T>(value: T | null | undefined): value is T {
-  return value !== null && value !== undefined;
+  public clear(): void {
+    this.cache.clear();
+  }
 }
