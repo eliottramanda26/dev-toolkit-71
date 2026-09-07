@@ -1,67 +1,26 @@
 /**
- * Utility functions for nested object property retrieval and mutation.
+ * Utility functions for dev-toolkit-71
  */
 
-type NestedObject = Record<string, any>;
+export type LoggerLevel = 'info' | 'warn' | 'error';
 
-/**
- * Parses a path string into individual keys and numeric indices.
- * Example: 'user.addresses[0].city' -> ['user', 'addresses', '0', 'city']
- */
-function parsePath(path: string): string[] {
-  return path
-    .replace(/\[(\d+)\]/g, '.$1')
-    .split('.')
-    .filter(Boolean);
-}
+export const formatTimestamp = (date: Date): string => {
+  return date.toISOString().replace('T', ' ').substring(0, 19);
+};
 
-/**
- * Safely retrieves a deeply nested value from an object using dot notation.
- */
-export function getByPath<T = any>(obj: NestedObject, path: string, defaultValue?: T): T | undefined {
-  if (!obj || typeof obj !== 'object') {
-    return defaultValue;
-  }
+export const logMessage = (level: LoggerLevel, message: string): void => {
+  const timestamp = formatTimestamp(new Date());
+  console[level](`[${timestamp}] [${level.toUpperCase()}]: ${message}`);
+};
 
-  const keys = parsePath(path);
-  let current: any = obj;
+export const delay = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
 
-  for (const key of keys) {
-    if (current === null || current === undefined || !(key in current)) {
-      return defaultValue;
-    }
-    current = current[key];
-  }
+export const validateConfig = <T extends Record<string, unknown>>(config: T, keys: (keyof T)[]): boolean => {
+  return keys.every((key) => config[key] !== undefined && config[key] !== null);
+};
 
-  return (current === undefined ? defaultValue : current) as T;
-}
-
-/**
- * Sets a deeply nested value in an object using dot notation.
- * Automatically constructs intermediate objects or arrays as needed.
- */
-export function setByPath(obj: NestedObject, path: string, value: any): boolean {
-  if (!obj || typeof obj !== 'object') {
-    return false;
-  }
-
-  const keys = parsePath(path);
-  if (keys.length === 0) return false;
-
-  let current: any = obj;
-
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-    const nextKey = keys[i + 1];
-
-    if (!(key in current) || current[key] === null || typeof current[key] !== 'object') {
-      current[key] = /^\d+$/.test(nextKey) ? [] : {};
-    }
-
-    current = current[key];
-  }
-
-  const lastKey = keys[keys.length - 1];
-  current[lastKey] = value;
-  return true;
-}
+export const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/[<>]/g, '');
+};
