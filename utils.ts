@@ -1,65 +1,47 @@
 /**
- * High-performance LRU cache utility for memoizing expensive operations
- * across core dev-toolkit components.
+ * Utility functions for dev-toolkit-71
  */
-export class LRUCache<K, V> {
-  private readonly capacity: number;
-  private cache: Map<K, V> = new Map();
 
-  constructor(capacity = 250) {
-    if (capacity <= 0) {
-      throw new Error('Cache capacity must be greater than zero');
-    }
-    this.capacity = capacity;
-  }
+export interface TaskResult<T> {
+  success: boolean;
+  data: T | null;
+  error: string | null;
+}
 
-  get(key: K): V | undefined {
-    if (!this.cache.has(key)) return undefined;
-    const value = this.cache.get(key)!;
-    // Refresh key priority in Map iteration order
-    this.cache.delete(key);
-    this.cache.set(key, value);
-    return value;
-  }
-
-  set(key: K, value: V): void {
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    } else if (this.cache.size >= this.capacity) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey !== undefined) {
-        this.cache.delete(oldestKey);
-      }
-    }
-    this.cache.set(key, value);
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-
-  get size(): number {
-    return this.cache.size;
+/**
+ * Safely executes a promise and returns a standardized result object
+ */
+export async function safeExecute<T>(fn: () => Promise<T>): Promise<TaskResult<T>> {
+  try {
+    const data = await fn();
+    return { success: true, data, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    return { success: false, data: null, error: message };
   }
 }
 
 /**
- * Wraps a synchronous function with LRU-based memoization to prevent redundant calculations.
+ * Formats a timestamp into a dev-toolkit-71 standard log string
  */
-export function memoize<T extends (...args: any[]) => any>(
-  fn: T,
-  maxSize = 100
-): T {
-  const cache = new LRUCache<string, ReturnType<T>>(maxSize);
+export function formatTimestamp(date: Date = new Date()): string {
+  return date.toISOString().replace('T', ' ').substring(0, 19);
+}
 
-  return ((...args: Parameters<T>): ReturnType<T> => {
-    const key = JSON.stringify(args);
-    const cachedResult = cache.get(key);
-    if (cachedResult !== undefined) {
-      return cachedResult;
-    }
-    const result = fn(...args);
-    cache.set(key, result);
-    return result;
-  }) as T;
+/**
+ * Debounce function to limit execution frequency of callback
+ */
+export function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+}
+
+/**
+ * Type guard to check if a value is a non-null object
+ */
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
