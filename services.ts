@@ -1,74 +1,74 @@
-export interface ProcessingTask {
+export interface JobInput {
   id: string;
+  type: string;
   payload: Record<string, unknown>;
-  timestamp: number;
+  priority: number;
 }
 
-export interface ValidationResult {
-  isValid: boolean;
-  errors: string[];
-}
-
-export interface ProcessingSummary {
-  processed: string[];
-  failed: { id: string; errors: string[] }[];
+export interface ProcessingResult {
+  jobId: string;
+  success: boolean;
+  error?: string;
 }
 
 export class TaskProcessorService {
-  /**
-   * Validates individual task payload for required fields and types.
-   */
-  public validateTask(task: ProcessingTask): ValidationResult {
-    const errors: string[] = [];
-
-    if (!task.id || typeof task.id !== 'string') {
-      errors.push('Task ID is missing or not a string');
+  // Validates incoming untrusted job payloads to prevent runtime failures
+  private validate(job: any): string | null {
+    if (!job || typeof job !== 'object') {
+      return 'Job must be a non-null object';
     }
-
-    if (!task.payload || typeof task.payload !== 'object' || Array.isArray(task.payload)) {
-      errors.push('Payload must be a non-null object');
-    } else {
-      if (typeof task.payload.action !== 'string') {
-        errors.push('Payload action is missing or not a string');
-      }
-      if (task.payload.priority !== undefined && typeof task.payload.priority !== 'number') {
-        errors.push('Payload priority must be a numeric value');
-      }
+    if (typeof job.id !== 'string' || job.id.trim() === '') {
+      return 'Invalid or missing job ID';
     }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
+    if (typeof job.type !== 'string' || job.type.trim() === '') {
+      return 'Invalid or missing job type';
+    }
+    if (!job.payload || typeof job.payload !== 'object') {
+      return 'Invalid or missing job payload';
+    }
+    if (typeof job.priority !== 'number' || job.priority < 0) {
+      return 'Priority must be a non-negative number';
+    }
+    return null;
   }
 
-  /**
-   * Iterates through batch inputs, validates each, and executes the processing loop.
-   */
-  public async processBatch(tasks: ProcessingTask[]): Promise<ProcessingSummary> {
-    const summary: ProcessingSummary = {
-      processed: [],
-      failed: [],
-    };
+  // Main processing loop with safety boundaries and inline validation
+  public async processBatch(jobs: unknown[]): Promise<ProcessingResult[]> {
+    const results: ProcessingResult[] = [];
 
-    for (const task of tasks) {
-      const validation = this.validateTask(task);
-
-      if (!validation.isValid) {
-        const taskId = task && task.id ? task.id : 'unknown';
-        summary.failed.push({ id: taskId, errors: validation.errors });
+    for (const rawJob of jobs) {
+      const validationError = this.validate(rawJob);
+      
+      if (validationError) {
+        results.push({
+          jobId: (rawJob as any)?.id || 'unknown',
+          success: false,
+          error: `Validation failed: ${validationError}`,
+        });
         continue;
       }
 
+      const job = rawJob as JobInput;
+
       try {
-        // Execute processing for valid tasks
-        summary.processed.push(task.id);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown execution error';
-        summary.failed.push({ id: task.id, errors: [message] });
+        await this.executeTask(job);
+        results.push({ jobId: job.id, success: true });
+      } catch (error) {
+        results.push({
+          jobId: job.id,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown execution error',
+        });
       }
     }
 
-    return summary;
+    return results;
+  }
+
+  private async executeTask(job: JobInput): Promise<void> {
+    if (job.type === 'error-trigger') {
+      throw new Error('Simulated workflow execution failure');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
   }
 }
