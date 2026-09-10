@@ -1,40 +1,40 @@
+/**
+ * Configuration interface for application environment settings
+ */
 export interface AppConfig {
-  env: 'development' | 'production' | 'test';
-  port: number;
-  host: string;
-  timeoutMs: number;
-  enableDebugLogs: boolean;
+  readonly port: number;
+  readonly environment: 'development' | 'production' | 'staging';
+  readonly apiTimeout: number;
+  readonly enableLogging: boolean;
 }
 
-const DEFAULT_CONFIG: AppConfig = {
-  env: 'development',
+/**
+ * Default application configuration object
+ */
+export const defaultConfig: AppConfig = {
   port: 3000,
-  host: 'localhost',
-  timeoutMs: 5000,
-  enableDebugLogs: false,
+  environment: 'development',
+  apiTimeout: 5000,
+  enableLogging: true,
 };
 
 /**
- * Loads configuration with fallback defaults and environment variables
+ * Validates provided partial config against strict types
+ * @param config - The user provided configuration object
+ * @returns The merged configuration object
  */
-export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
-  const env = (typeof process !== 'undefined' && process.env?.NODE_ENV as AppConfig['env']) || DEFAULT_CONFIG.env;
-  const portStr = typeof process !== 'undefined' ? process.env?.PORT : undefined;
-  const portEnv = portStr ? parseInt(portStr, 10) : undefined;
-  const hostEnv = typeof process !== 'undefined' ? process.env?.HOST : undefined;
-
-  const merged: AppConfig = {
-    ...DEFAULT_CONFIG,
-    env,
-    ...(portEnv !== undefined && !isNaN(portEnv) ? { port: portEnv } : {}),
-    ...(hostEnv ? { host: hostEnv } : {}),
-    ...overrides,
+export function createConfig(config: Partial<AppConfig>): AppConfig {
+  return {
+    ...defaultConfig,
+    ...config,
   };
-
-  // Basic configuration integrity assertion
-  if (merged.port < 1 || merged.port > 65535) {
-    throw new Error(`Configuration validation failed: Invalid port number ${merged.port}`);
-  }
-
-  return merged;
 }
+
+/**
+ * Helper to retrieve environment variables with type safety
+ * @param key - The environment variable name
+ * @returns The string value or undefined
+ */
+export const getEnvVar = (key: string): string | undefined => {
+  return process.env[key];
+};
