@@ -1,38 +1,34 @@
-export interface ProcessingJob {
-  id: string;
-  payload: Record<string, unknown>;
-  timestamp: number;
-}
+/**
+ * Utility functions for dev-toolkit-71 data processing
+ */
 
-export class JobProcessor {
-  /** Validates job data structure before processing */
-  private isValidJob(job: unknown): job is ProcessingJob {
-    if (typeof job !== 'object' || job === null) return false;
-    const j = job as any;
-    return (
-      typeof j.id === 'string' &&
-      typeof j.payload === 'object' &&
-      typeof j.timestamp === 'number'
-    );
-  }
+export type DataTransformer<T, U> = (data: T) => U;
 
-  /** Main processing loop for incoming job batches */
-  public processBatch(batch: unknown[]): void {
-    for (const item of batch) {
-      try {
-        if (!this.isValidJob(item)) {
-          console.warn('Skipping invalid job payload detected');
-          continue;
-        }
+export const deepClone = <T>(obj: T): T => {
+  return JSON.parse(JSON.stringify(obj));
+};
 
-        this.executeJob(item);
-      } catch (err) {
-        console.error(`Fatal execution error: ${(err as Error).message}`);
-      }
+export const groupBy = <T>(array: T[], key: keyof T): Record<string, T[]> => {
+  return array.reduce((acc, item) => {
+    const groupKey = String(item[key]);
+    if (!acc[groupKey]) {
+      acc[groupKey] = [];
     }
-  }
+    acc[groupKey].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
+};
 
-  private executeJob(job: ProcessingJob): void {
-    console.log(`Processing job ${job.id}`);
+export const normalizeData = <T, U>(
+  data: T[], 
+  transformer: DataTransformer<T, U>
+): U[] => {
+  if (!Array.isArray(data)) {
+    throw new Error('Input must be an array');
   }
-}
+  return data.map(transformer);
+};
+
+export const filterNullable = <T>(array: (T | null | undefined)[]): T[] => {
+  return array.filter((item): item is T => item !== null && item !== undefined);
+};
