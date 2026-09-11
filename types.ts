@@ -1,37 +1,47 @@
-export interface ProcessingConfig {
-  maxRetries: number;
-  timeoutMs: number;
+/**
+ * Represents the current execution state of a toolkit task.
+ */
+export type TaskStatus = 'idle' | 'running' | 'success' | 'failed';
+
+/**
+ * Standard structure for all task execution outputs.
+ */
+export interface TaskResult<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: Error;
+  durationMs: number;
 }
 
-export interface ProcessableInput {
-  id: string;
-  payload: Record<string, unknown>;
-  timestamp: number;
+/**
+ * Execution context passed down to individual tools and runner functions.
+ */
+export interface TaskContext {
+  env: 'development' | 'production' | 'test';
+  verbose: boolean;
+  startTime: number;
 }
 
-export function validateInput(input: unknown): input is ProcessableInput {
-  if (typeof input !== 'object' || input === null) return false;
-  const data = input as Record<string, unknown>;
+/**
+ * A runnable task within the dev-toolkit lifecycle.
+ */
+export type TaskFunction<T = unknown> = (ctx: TaskContext) => Promise<T> | T;
 
-  return (
-    typeof data.id === 'string' &&
-    typeof data.timestamp === 'number' &&
-    typeof data.payload === 'object' &&
-    data.payload !== null
-  );
+/**
+ * Global configuration options for the dev-toolkit-71 instance.
+ */
+export interface ToolkitConfig {
+  name: string;
+  version: string;
+  debug: boolean;
+  plugins?: string[];
 }
 
-export function processLoop(items: unknown[]): void {
-  for (const item of items) {
-    if (!validateInput(item)) {
-      console.error(`Invalid input schema detected for item: ${JSON.stringify(item)}`);
-      continue;
-    }
-
-    try {
-      console.log(`Processing item ${item.id} at ${item.timestamp}`);
-    } catch (err) {
-      console.error(`Execution failure on item ${item.id}:`, err);
-    }
-  }
+/**
+ * Plugable logging interface for standard output handling.
+ */
+export interface Logger {
+  info: (message: string, ...args: unknown[]) => void;
+  warn: (message: string, ...args: unknown[]) => void;
+  error: (message: string, ...args: unknown[]) => void;
 }
