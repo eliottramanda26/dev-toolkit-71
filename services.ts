@@ -1,34 +1,38 @@
+export interface ServiceResponse<T> {
+  data: T | null;
+  error: Error | null;
+  timestamp: number;
+}
+
 /**
- * Utility functions for dev-toolkit-71 data processing
+ * Executes a service operation with standardized error wrapping
  */
-
-export type DataTransformer<T, U> = (data: T) => U;
-
-export const deepClone = <T>(obj: T): T => {
-  return JSON.parse(JSON.stringify(obj));
-};
-
-export const groupBy = <T>(array: T[], key: keyof T): Record<string, T[]> => {
-  return array.reduce((acc, item) => {
-    const groupKey = String(item[key]);
-    if (!acc[groupKey]) {
-      acc[groupKey] = [];
-    }
-    acc[groupKey].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
-};
-
-export const normalizeData = <T, U>(
-  data: T[], 
-  transformer: DataTransformer<T, U>
-): U[] => {
-  if (!Array.isArray(data)) {
-    throw new Error('Input must be an array');
+export async function executeService<T>(operation: () => Promise<T>): Promise<ServiceResponse<T>> {
+  try {
+    const result = await operation();
+    return { data: result, error: null, timestamp: Date.now() };
+  } catch (err) {
+    return { 
+      data: null, 
+      error: err instanceof Error ? err : new Error(String(err)), 
+      timestamp: Date.now() 
+    };
   }
-  return data.map(transformer);
+}
+
+/**
+ * Batch utility for handling multiple concurrent service calls
+ */
+export async function batchExecute<T>(operations: Array<() => Promise<T>>): Promise<ServiceResponse<T>[]> {
+  return Promise.all(operations.map(op => executeService(op)));
+}
+
+export const serviceLogger = (message: string) => {
+  console.log(`[dev-toolkit-71][${new Date().toISOString()}] ${message}`);
 };
 
-export const filterNullable = <T>(array: (T | null | undefined)[]): T[] => {
-  return array.filter((item): item is T => item !== null && item !== undefined);
+export default {
+  executeService,
+  batchExecute,
+  serviceLogger
 };
