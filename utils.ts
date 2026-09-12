@@ -1,49 +1,50 @@
-export class AppError extends Error {
-  constructor(public message: string, public statusCode: number = 500) {
-    super(message);
-    this.name = 'AppError';
-  }
-}
-
 /**
- * Safely executes a promise with provided fallback value
+ * Creates a debounced function that delays invoking the provided function
+ * until after the specified delay in milliseconds has elapsed.
  */
-export async function safeExecute<T>(
-  fn: () => Promise<T>,
-  fallback: T
-): Promise<T> {
-  try {
-    return await fn();
-  } catch (error) {
-    console.error('[dev-toolkit-71] execution error:', error);
-    return fallback;
-  }
-}
+export function debounce<T extends (...args: any[]) => void>(
+  fn: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-/**
- * Validates object schema presence
- */
-export function validateInput<T>(input: T | null | undefined): T {
-  if (input === null || input === undefined) {
-    throw new AppError('Invalid input provided', 400);
-  }
-  return input;
-}
-
-/**
- * Utility for retrying operations with simple backoff
- */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  retries: number = 3
-): Promise<T> {
-  let lastError: unknown;
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
+  return function (this: any, ...args: Parameters<T>): void {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
     }
+    timeoutId = setTimeout(() => {
+      fn.apply(this, args);
+    }, delay);
+  };
+}
+
+/**
+ * Groups elements of an array based on the key returned by the selector function.
+ */
+export function groupBy<T, K extends PropertyKey>(
+  array: T[],
+  getKey: (item: T) => K
+): Record<K, T[]> {
+  return array.reduce((accumulator, currentItem) => {
+    const key = getKey(currentItem);
+    if (!accumulator[key]) {
+      accumulator[key] = [];
+    }
+    accumulator[key].push(currentItem);
+    return accumulator;
+  }, {} as Record<K, T[]>);
+}
+
+/**
+ * Splits an array into smaller chunks of a specified maximum size.
+ */
+export function chunk<T>(array: T[], size: number): T[][] {
+  if (size <= 0) {
+    return [];
   }
-  throw lastError;
+  const result: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
 }
