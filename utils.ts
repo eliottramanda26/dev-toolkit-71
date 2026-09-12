@@ -1,50 +1,49 @@
 /**
- * Creates a debounced function that delays invoking the provided function
- * until after the specified delay in milliseconds has elapsed.
+ * Utility functions for dev-toolkit-71 data processing
  */
-export function debounce<T extends (...args: any[]) => void>(
-  fn: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-  return function (this: any, ...args: Parameters<T>): void {
-    if (timeoutId !== undefined) {
-      clearTimeout(timeoutId);
+export type DataValue = string | number | boolean | null | undefined;
+
+/**
+ * Sanitizes object by removing undefined keys and trimming strings
+ */
+export function sanitizeObject<T extends Record<string, any>>(data: T): Partial<T> {
+  const result: any = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) continue;
+
+    if (typeof value === 'string') {
+      result[key] = value.trim();
+    } else {
+      result[key] = value;
     }
-    timeoutId = setTimeout(() => {
-      fn.apply(this, args);
-    }, delay);
-  };
+  }
+
+  return result as Partial<T>;
 }
 
 /**
- * Groups elements of an array based on the key returned by the selector function.
+ * Safely parses JSON strings with default fallback
  */
-export function groupBy<T, K extends PropertyKey>(
-  array: T[],
-  getKey: (item: T) => K
-): Record<K, T[]> {
-  return array.reduce((accumulator, currentItem) => {
-    const key = getKey(currentItem);
-    if (!accumulator[key]) {
-      accumulator[key] = [];
-    }
-    accumulator[key].push(currentItem);
-    return accumulator;
-  }, {} as Record<K, T[]>);
+export function safeJsonParse<T>(json: string, fallback: T): T {
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 /**
- * Splits an array into smaller chunks of a specified maximum size.
+ * Groups array items by key property
  */
-export function chunk<T>(array: T[], size: number): T[][] {
-  if (size <= 0) {
-    return [];
-  }
-  const result: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    result.push(array.slice(i, i + size));
-  }
-  return result;
+export function groupBy<T>(items: T[], key: keyof T): Record<string, T[]> {
+  return items.reduce((acc, item) => {
+    const groupKey = String(item[key]);
+    if (!acc[groupKey]) {
+      acc[groupKey] = [];
+    }
+    acc[groupKey].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
 }
