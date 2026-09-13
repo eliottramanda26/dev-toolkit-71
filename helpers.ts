@@ -1,39 +1,47 @@
-import * as fs from 'fs';
-import * as path from 'path';
+/**
+ * Memoizes function results to optimize repetitive computations
+ * within dev-toolkit-71 core modules.
+ */
+export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
+  const cache = new Map<T, R>();
 
-interface LoggerConfig {
-  logDir: string;
-  maxSizeMb: number;
+  return (arg: T): R => {
+    if (cache.has(arg)) {
+      return cache.get(arg)!;
+    }
+    const result = fn(arg);
+    cache.set(arg, result);
+    return result;
+  };
 }
 
 /**
- * Manages log file rotation based on size
+ * Debounce utility to limit execution rate of high-frequency events
  */
-export const setupLogger = (config: LoggerConfig) => {
-  const logPath = path.join(config.logDir, 'app.log');
+export function debounce<F extends (...args: any[]) => void>(
+  fn: F,
+  delay: number
+): (...args: Parameters<F>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  if (!fs.existsSync(config.logDir)) {
-    fs.mkdirSync(config.logDir, { recursive: true });
-  }
-
-  return (message: string) => {
-    const entry = `[${new Date().toISOString()}] ${message}\n`;
-
-    if (fs.existsSync(logPath)) {
-      const stats = fs.statSync(logPath);
-      const fileSizeMb = stats.size / (1024 * 1024);
-
-      if (fileSizeMb >= config.maxSizeMb) {
-        const timestamp = Date.now();
-        fs.renameSync(logPath, `${logPath}.${timestamp}.bak`);
-      }
+  return (...args: Parameters<F>) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
     }
-
-    fs.appendFileSync(logPath, entry);
+    timeoutId = setTimeout(() => {
+      fn(...args);
+    }, delay);
   };
-};
+}
 
-export const logger = setupLogger({ 
-  logDir: './logs', 
-  maxSizeMb: 5 
-});
+/**
+ * Batch processor for handling arrays in smaller chunks
+ * to prevent event loop blocking in large datasets
+ */
+export function chunkArray<T>(array: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
+}
