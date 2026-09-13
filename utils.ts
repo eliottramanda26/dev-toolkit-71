@@ -1,43 +1,36 @@
-export interface RetryOptions {
-  retries?: number;
-  delay?: number;
-  factor?: number;
-  shouldRetry?: (error: any) => boolean;
+interface ProcessInput {
+  id: string;
+  value: number;
 }
 
 /**
- * Executes an asynchronous network operation and retries it upon failure.
- * Supports custom retry counts, backoff factors, and conditional checks.
+ * Validates processing inputs against business constraints
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const {
-    retries = 3,
-    delay = 1000,
-    factor = 2,
-    shouldRetry = () => true,
-  } = options;
+export function validateInput(input: unknown): input is ProcessInput {
+  if (!input || typeof input !== 'object') return false;
+  
+  const { id, value } = input as Record<string, unknown>;
 
-  let currentDelay = delay;
+  return (
+    typeof id === 'string' && id.length > 0 &&
+    typeof value === 'number' && Number.isFinite(value) && value >= 0
+  );
+}
 
-  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+/**
+ * Executes main processing logic with input guard
+ */
+export function processLoop(items: unknown[]): void {
+  for (const item of items) {
+    if (!validateInput(item)) {
+      console.warn('Skipping invalid item in loop:', item);
+      continue;
+    }
+
     try {
-      return await fn();
+      console.log(`Processing item ${item.id}: ${item.value}`);
     } catch (error) {
-      const isLastAttempt = attempt > retries;
-      const allowsRetry = shouldRetry(error);
-
-      if (isLastAttempt || !allowsRetry) {
-        throw error;
-      }
-
-      // Delay next attempt using exponential backoff
-      await new Promise((resolve) => setTimeout(resolve, currentDelay));
-      currentDelay *= factor;
+      console.error(`Failure processing item ${item.id}:`, error);
     }
   }
-
-  throw new Error("Retry helper exited unexpectedly");
 }
