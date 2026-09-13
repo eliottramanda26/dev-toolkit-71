@@ -1,49 +1,47 @@
 /**
- * Utility functions for dev-toolkit-71 data processing
+ * Optimized data processing utilities for dev-toolkit-71 core
  */
 
-export type DataValue = string | number | boolean | null | undefined;
-
-/**
- * Sanitizes object by removing undefined keys and trimming strings
- */
-export function sanitizeObject<T extends Record<string, any>>(data: T): Partial<T> {
-  const result: any = {};
-
-  for (const [key, value] of Object.entries(data)) {
-    if (value === undefined) continue;
-
-    if (typeof value === 'string') {
-      result[key] = value.trim();
-    } else {
-      result[key] = value;
-    }
-  }
-
-  return result as Partial<T>;
+export interface PerformanceConfig {
+  memoizationLimit: number;
+  useCache: boolean;
 }
 
 /**
- * Safely parses JSON strings with default fallback
+ * Caches results of expensive computations to improve throughput
  */
-export function safeJsonParse<T>(json: string, fallback: T): T {
-  try {
-    return JSON.parse(json) as T;
-  } catch {
-    return fallback;
-  }
+export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
+  const cache = new Map<T, R>();
+  return (arg: T): R => {
+    if (cache.has(arg)) {
+      return cache.get(arg)!;
+    }
+    const result = fn(arg);
+    cache.set(arg, result);
+    return result;
+  };
 }
 
 /**
- * Groups array items by key property
+ * Batch processing utility to reduce event loop pressure
  */
-export function groupBy<T>(items: T[], key: keyof T): Record<string, T[]> {
-  return items.reduce((acc, item) => {
-    const groupKey = String(item[key]);
-    if (!acc[groupKey]) {
-      acc[groupKey] = [];
-    }
-    acc[groupKey].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
+export async function batchProcess<T, R>(
+  items: T[],
+  processor: (item: T) => Promise<R>,
+  batchSize: number = 10
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
+/**
+ * Efficient deep clone for small object state updates
+ */
+export function fastClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
 }
