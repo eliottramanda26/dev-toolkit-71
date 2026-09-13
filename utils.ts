@@ -1,47 +1,43 @@
-/**
- * Optimized data processing utilities for dev-toolkit-71 core
- */
-
-export interface PerformanceConfig {
-  memoizationLimit: number;
-  useCache: boolean;
+export interface RetryOptions {
+  retries?: number;
+  delay?: number;
+  factor?: number;
+  shouldRetry?: (error: any) => boolean;
 }
 
 /**
- * Caches results of expensive computations to improve throughput
+ * Executes an asynchronous network operation and retries it upon failure.
+ * Supports custom retry counts, backoff factors, and conditional checks.
  */
-export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
-  const cache = new Map<T, R>();
-  return (arg: T): R => {
-    if (cache.has(arg)) {
-      return cache.get(arg)!;
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const {
+    retries = 3,
+    delay = 1000,
+    factor = 2,
+    shouldRetry = () => true,
+  } = options;
+
+  let currentDelay = delay;
+
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isLastAttempt = attempt > retries;
+      const allowsRetry = shouldRetry(error);
+
+      if (isLastAttempt || !allowsRetry) {
+        throw error;
+      }
+
+      // Delay next attempt using exponential backoff
+      await new Promise((resolve) => setTimeout(resolve, currentDelay));
+      currentDelay *= factor;
     }
-    const result = fn(arg);
-    cache.set(arg, result);
-    return result;
-  };
-}
-
-/**
- * Batch processing utility to reduce event loop pressure
- */
-export async function batchProcess<T, R>(
-  items: T[],
-  processor: (item: T) => Promise<R>,
-  batchSize: number = 10
-): Promise<R[]> {
-  const results: R[] = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    const batchResults = await Promise.all(batch.map(processor));
-    results.push(...batchResults);
   }
-  return results;
-}
 
-/**
- * Efficient deep clone for small object state updates
- */
-export function fastClone<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
+  throw new Error("Retry helper exited unexpectedly");
 }
