@@ -1,47 +1,28 @@
 /**
- * Memoizes function results to optimize repetitive computations
- * within dev-toolkit-71 core modules.
+ * Utility functions for dev-toolkit-71
  */
-export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
-  const cache = new Map<T, R>();
 
-  return (arg: T): R => {
-    if (cache.has(arg)) {
-      return cache.get(arg)!;
-    }
-    const result = fn(arg);
-    cache.set(arg, result);
-    return result;
+export const debounce = <T extends (...args: any[]) => void>(func: T, delay: number) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
   };
-}
+};
 
-/**
- * Debounce utility to limit execution rate of high-frequency events
- */
-export function debounce<F extends (...args: any[]) => void>(
-  fn: F,
-  delay: number
-): (...args: Parameters<F>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+export const delay = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
 
-  return (...args: Parameters<F>) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      fn(...args);
-    }, delay);
-  };
-}
+export const getOrElse = <T>(value: T | null | undefined, defaultValue: T): T => {
+  return value ?? defaultValue;
+};
 
-/**
- * Batch processor for handling arrays in smaller chunks
- * to prevent event loop blocking in large datasets
- */
-export function chunkArray<T>(array: T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    result.push(array.slice(i, i + size));
-  }
-  return result;
-}
+export const isObject = (item: unknown): item is Record<string, unknown> => {
+  return item !== null && typeof item === 'object' && !Array.isArray(item);
+};
+
+export const truncate = (str: string, length: number): string => {
+  if (str.length <= length) return str;
+  return str.slice(0, length) + '...';
+};
