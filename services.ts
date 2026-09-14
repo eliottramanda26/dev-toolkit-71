@@ -1,50 +1,53 @@
-export interface ServiceConfig {
-  endpoint: string;
-  timeout: number;
-  retryAttempts: number;
-}
+export class MemoizationService {
+  private cache = new Map<string, { value: any; expiry: number }>();
+  private defaultTtlMs: number;
 
-/**
- * Represents a standard response envelope for toolkit operations
- */
-export interface ToolkitResponse<T> {
-  data: T | null;
-  success: boolean;
-  timestamp: number;
-}
-
-/**
- * Orchestrates communication with the dev-toolkit-71 backend
- */
-export class DevToolkitService {
-  private readonly config: ServiceConfig;
-
-  constructor(config: ServiceConfig) {
-    this.config = config;
+  constructor(defaultTtlMs = 60000) {
+    this.defaultTtlMs = defaultTtlMs;
   }
 
   /**
-   * Fetches resource data with simple retry logic
+   * Executes a function and caches its result, or returns the cached result if valid.
    */
-  public async fetchData<T>(path: string): Promise<ToolkitResponse<T>> {
-    let attempts = 0;
+  async getOrCreate<T>(
+    key: string,
+    fetcher: () => Promise<T>,
+    ttlMs?: number
+  ): Promise<T> {
+    const now = Date.now();
+    const cached = this.cache.get(key);
 
-    while (attempts < this.config.retryAttempts) {
-      try {
-        const response = await fetch(`${this.config.endpoint}/${path}`, {
-          signal: AbortSignal.timeout(this.config.timeout),
-        });
-
-        if (!response.ok) throw new Error(`Status ${response.status}`);
-
-        const data: T = await response.json();
-        return { data, success: true, timestamp: Date.now() };
-      } catch (err) {
-        attempts++;
-        if (attempts >= this.config.retryAttempts) break;
-      }
+    if (cached && cached.expiry > now) {
+      return cached.value as T;
     }
 
-    return { data: null, success: false, timestamp: Date.now() };
+    const freshValue = await fetcher();
+    const duration = ttlMs ?? this.defaultTtlMs;
+
+    this.cache.set(key, {
+      value: freshValue,
+      expiry: now + duration,
+    });
+
+    return freshValue;
+  }
+
+  /**
+   * Evicts a specific key from the cache.
+   */
+  invalidate(key: string): void {
+    this.cache.delete(key);
+  }
+
+  /**
+   * Clears expired items from the cache to optimize memory.
+   */
+  prune(): void {
+    const now = Date.now();
+    for (const [key, item] of this.cache.entries()) {
+      if (item.expiry <= now) {
+        this.cache.delete(key);
+      }
+    }
   }
 }
