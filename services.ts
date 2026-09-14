@@ -1,38 +1,50 @@
-export interface ServiceResponse<T> {
+export interface ServiceConfig {
+  endpoint: string;
+  timeout: number;
+  retryAttempts: number;
+}
+
+/**
+ * Represents a standard response envelope for toolkit operations
+ */
+export interface ToolkitResponse<T> {
   data: T | null;
-  error: Error | null;
+  success: boolean;
   timestamp: number;
 }
 
 /**
- * Executes a service operation with standardized error wrapping
+ * Orchestrates communication with the dev-toolkit-71 backend
  */
-export async function executeService<T>(operation: () => Promise<T>): Promise<ServiceResponse<T>> {
-  try {
-    const result = await operation();
-    return { data: result, error: null, timestamp: Date.now() };
-  } catch (err) {
-    return { 
-      data: null, 
-      error: err instanceof Error ? err : new Error(String(err)), 
-      timestamp: Date.now() 
-    };
+export class DevToolkitService {
+  private readonly config: ServiceConfig;
+
+  constructor(config: ServiceConfig) {
+    this.config = config;
+  }
+
+  /**
+   * Fetches resource data with simple retry logic
+   */
+  public async fetchData<T>(path: string): Promise<ToolkitResponse<T>> {
+    let attempts = 0;
+
+    while (attempts < this.config.retryAttempts) {
+      try {
+        const response = await fetch(`${this.config.endpoint}/${path}`, {
+          signal: AbortSignal.timeout(this.config.timeout),
+        });
+
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+
+        const data: T = await response.json();
+        return { data, success: true, timestamp: Date.now() };
+      } catch (err) {
+        attempts++;
+        if (attempts >= this.config.retryAttempts) break;
+      }
+    }
+
+    return { data: null, success: false, timestamp: Date.now() };
   }
 }
-
-/**
- * Batch utility for handling multiple concurrent service calls
- */
-export async function batchExecute<T>(operations: Array<() => Promise<T>>): Promise<ServiceResponse<T>[]> {
-  return Promise.all(operations.map(op => executeService(op)));
-}
-
-export const serviceLogger = (message: string) => {
-  console.log(`[dev-toolkit-71][${new Date().toISOString()}] ${message}`);
-};
-
-export default {
-  executeService,
-  batchExecute,
-  serviceLogger
-};
