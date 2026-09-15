@@ -1,53 +1,60 @@
-export class MemoizationService {
-  private cache = new Map<string, { value: any; expiry: number }>();
-  private defaultTtlMs: number;
+export interface ProcessTask {
+  id: string;
+  payload: Record<string, unknown>;
+  priority: number;
+}
 
-  constructor(defaultTtlMs = 60000) {
-    this.defaultTtlMs = defaultTtlMs;
-  }
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
 
+export class TaskProcessorService {
   /**
-   * Executes a function and caches its result, or returns the cached result if valid.
+   * Validates an individual task payload before execution.
    */
-  async getOrCreate<T>(
-    key: string,
-    fetcher: () => Promise<T>,
-    ttlMs?: number
-  ): Promise<T> {
-    const now = Date.now();
-    const cached = this.cache.get(key);
+  public validateTask(task: ProcessTask): ValidationResult {
+    const errors: string[] = [];
 
-    if (cached && cached.expiry > now) {
-      return cached.value as T;
+    if (!task.id || typeof task.id !== 'string') {
+      errors.push('Task ID is required and must be a string.');
     }
 
-    const freshValue = await fetcher();
-    const duration = ttlMs ?? this.defaultTtlMs;
+    if (!task.payload || typeof task.payload !== 'object' || Array.isArray(task.payload)) {
+      errors.push('Task payload must be a non-null object.');
+    }
 
-    this.cache.set(key, {
-      value: freshValue,
-      expiry: now + duration,
-    });
+    if (typeof task.priority !== 'number' || task.priority < 1 || task.priority > 5) {
+      errors.push('Task priority must be a number between 1 and 5.');
+    }
 
-    return freshValue;
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
   }
 
   /**
-   * Evicts a specific key from the cache.
+   * Processes a batch of tasks with input validation in the main loop.
    */
-  invalidate(key: string): void {
-    this.cache.delete(key);
-  }
+  public processBatch(tasks: ProcessTask[]): { processed: string[]; failed: Array<{ id: string; errors: string[] }> } {
+    const processed: string[] = [];
+    const failed: Array<{ id: string; errors: string[] }> = [];
 
-  /**
-   * Clears expired items from the cache to optimize memory.
-   */
-  prune(): void {
-    const now = Date.now();
-    for (const [key, item] of this.cache.entries()) {
-      if (item.expiry <= now) {
-        this.cache.delete(key);
+    for (const task of tasks) {
+      const validation = this.validateTask(task);
+
+      if (!validation.valid) {
+        failed.push({
+          id: task?.id || 'unknown',
+          errors: validation.errors,
+        });
+        continue;
       }
+
+      processed.push(task.id);
     }
+
+    return { processed, failed };
   }
 }
