@@ -1,9 +1,10 @@
 /**
- * Configuration interface for application environment settings
+ * Configuration interface for dev-toolkit-71 core modules
  */
-export interface AppConfig {
-  readonly port: number;
-  readonly environment: 'development' | 'production' | 'staging';
+export interface ToolkitConfig {
+  readonly version: string;
+  readonly environment: 'development' | 'production' | 'test';
+  readonly retryAttempts: number;
   readonly apiTimeout: number;
   readonly enableLogging: boolean;
 }
@@ -11,30 +12,29 @@ export interface AppConfig {
 /**
  * Default application configuration object
  */
-export const defaultConfig: AppConfig = {
-  port: 3000,
+export const defaultConfig: ToolkitConfig = {
+  version: '1.0.0',
   environment: 'development',
+  retryAttempts: 3,
   apiTimeout: 5000,
   enableLogging: true,
 };
 
 /**
- * Validates provided partial config against strict types
- * @param config - The user provided configuration object
- * @returns The merged configuration object
+ * Merges partial config with default values
+ * 
+ * @param overrides Partial configuration options
+ * @returns Complete ToolkitConfig object
  */
-export function createConfig(config: Partial<AppConfig>): AppConfig {
+export const getConfiguration = (overrides: Partial<ToolkitConfig>): ToolkitConfig => {
   return {
     ...defaultConfig,
-    ...config,
+    ...overrides,
   };
-}
+};
 
 /**
- * Helper to retrieve environment variables with type safety
- * @param key - The environment variable name
- * @returns The string value or undefined
+ * Constants for environment variables
  */
-export const getEnvVar = (key: string): string | undefined => {
-  return process.env[key];
-};
+export const APP_NAME: string = 'dev-toolkit-71';
+export const SUPPORTED_REGIONS: readonly string[] = ['us-east-1', 'eu-west-1'];
