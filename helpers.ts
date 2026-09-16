@@ -1,28 +1,32 @@
+export interface RetryOptions {
+  maxAttempts: number;
+  delayMs: number;
+}
+
 /**
- * Utility functions for dev-toolkit-71
+ * Executes a function with exponential backoff retry logic
  */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
+): Promise<T> {
+  let lastError: unknown;
 
-export const debounce = <T extends (...args: any[]) => void>(func: T, delay: number) => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
-  };
-};
+  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
 
-export const delay = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
+      if (attempt < options.maxAttempts) {
+        const delay = options.delayMs * Math.pow(2, attempt - 1);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
 
-export const getOrElse = <T>(value: T | null | undefined, defaultValue: T): T => {
-  return value ?? defaultValue;
-};
+  throw lastError;
+}
 
-export const isObject = (item: unknown): item is Record<string, unknown> => {
-  return item !== null && typeof item === 'object' && !Array.isArray(item);
-};
-
-export const truncate = (str: string, length: number): string => {
-  if (str.length <= length) return str;
-  return str.slice(0, length) + '...';
-};
+export const delay = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
