@@ -1,43 +1,39 @@
 interface ProcessingInput {
   id: string;
   value: number;
+  timestamp: number;
 }
 
 /**
- * Validates input against business logic requirements
+ * Validates processing inputs against business rules
  */
-function isValidInput(input: unknown): input is ProcessingInput {
+function validateInput(input: unknown): input is ProcessingInput {
+  if (!input || typeof input !== 'object') return false;
+  const { id, value, timestamp } = input as any;
+
   return (
-    typeof input === 'object' &&
-    input !== null &&
-    'id' in input &&
-    typeof (input as any).id === 'string' &&
-    'value' in input &&
-    typeof (input as any).value === 'number' &&
-    (input as any).value >= 0
+    typeof id === 'string' && id.length > 0 &&
+    typeof value === 'number' && value >= 0 &&
+    typeof timestamp === 'number' && timestamp <= Date.now()
   );
 }
 
 /**
- * Main loop processor for dev-toolkit-71 operations
+ * Main processing loop for dev-toolkit-71 operations
  */
-export function runProcessingLoop(dataQueue: unknown[]): void {
-  console.log('Starting batch processing...');
-
-  for (const item of dataQueue) {
-    if (!isValidInput(item)) {
-      console.error('Invalid schema detected, skipping entry:', item);
+export function processDataStream(inputs: unknown[]): void {
+  for (const entry of inputs) {
+    if (!validateInput(entry)) {
+      console.error('Invalid schema detected in stream, skipping:', entry);
       continue;
     }
 
     try {
-      // Execute processing logic for validated input
-      const result = item.value * 1.05;
-      console.log(`Processed item ${item.id}: ${result}`);
+      // Execute business logic for valid inputs
+      const result = entry.value * 1.05;
+      console.log(`Processed id ${entry.id}: ${result}`);
     } catch (err) {
-      console.error(`Execution failure for ${item.id}:`, err);
+      console.error(`Execution failure for ${entry.id}:`, err);
     }
   }
-
-  console.log('Processing loop complete.');
 }
