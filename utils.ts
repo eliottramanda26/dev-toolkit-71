@@ -1,66 +1,39 @@
+export type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
 /**
- * Executes an async function with exponential backoff retry logic.
+ * Checks if a value is a plain object.
  */
-export async function retry<T>(
-  fn: () => Promise<T>,
-  retries: number = 3,
-  delayMs: number = 500
-): Promise<T> {
-  try {
-    return await fn();
-  } catch (error) {
-    if (retries <= 0) throw error;
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-    return retry(fn, retries - 1, delayMs * 2);
-  }
+function isObject(item: unknown): item is Record<string, any> {
+  return item !== null && typeof item === 'object' && !Array.isArray(item);
 }
 
 /**
- * Splits an array into smaller chunks of a specified size.
+ * Deeply merges multiple source objects into a target object.
+ * Properties from subsequent objects will overwrite existing properties.
  */
-export function chunk<T>(array: T[], size: number): T[][] {
-  if (size <= 0) return [];
-  const result: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    result.push(array.slice(i, i + size));
+export function deepMerge<T extends Record<string, any>>(target: T, ...sources: DeepPartial<T>[]): T {
+  if (!sources.length) {
+    return target;
   }
-  return result;
-}
+  const source = sources.shift();
 
-/**
- * Creates a new object omitting specified keys from the original.
- */
-export function omit<T extends Record<string, unknown>, K extends keyof T>(
-  obj: T,
-  keys: K[]
-): Omit<T, K> {
-  const keySet = new Set<string>(keys as string[]);
-  const result = {} as Record<string, unknown>;
-
-  for (const [key, value] of Object.entries(obj)) {
-    if (!keySet.has(key)) {
-      result[key] = value;
+  if (isObject(target) && isObject(source)) {
+    for (const key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        const sourceValue = source[key];
+        if (isObject(sourceValue)) {
+          if (!target[key]) {
+            Object.assign(target, { [key]: {} });
+          }
+          deepMerge(target[key], sourceValue);
+        } else {
+          Object.assign(target, { [key]: sourceValue });
+        }
+      }
     }
   }
 
-  return result as Omit<T, K>;
-}
-
-/**
- * Delays function execution until a quiet period has elapsed.
- */
-export function debounce<T extends (...args: unknown[]) => void>(
-  func: T,
-  waitMs: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  return (...args: Parameters<T>) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      func(...args);
-    }, waitMs);
-  };
+  return deepMerge(target, ...sources);
 }
