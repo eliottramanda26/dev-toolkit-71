@@ -1,36 +1,43 @@
+/**
+ * Configuration interface for application environment settings.
+ */
 export interface AppConfig {
-  env: string;
-  version: string;
-  timeout: number;
-  retries: number;
+  readonly port: number;
+  readonly environment: 'development' | 'staging' | 'production';
+  readonly apiEndpoint: string;
+  readonly timeoutMs: number;
 }
 
 /**
- * default application configuration settings
+ * Default application settings used across dev-toolkit-71.
  */
 export const defaultConfig: AppConfig = {
-  env: process.env.NODE_ENV || 'development',
-  version: '1.0.0',
-  timeout: 5000,
-  retries: 3
+  port: 3000,
+  environment: 'development',
+  apiEndpoint: 'https://api.dev-toolkit-71.internal',
+  timeoutMs: 5000
 };
 
 /**
- * validates current configuration object
+ * Validates that the provided configuration meets minimum requirements.
+ * @param config - The application configuration object
+ * @returns boolean indicating validity
  */
-export function validateConfig(config: AppConfig): boolean {
-  if (config.timeout < 0) return false;
-  if (config.retries < 0) return false;
-  return true;
-}
+export const validateConfig = (config: AppConfig): boolean => {
+  const isValidPort = config.port > 1024 && config.port <= 65535;
+  const isValidEndpoint = config.apiEndpoint.startsWith('https://');
+
+  return isValidPort && isValidEndpoint;
+};
 
 /**
- * merges partial overrides into default config
+ * Merges partial config overrides into the default configuration.
+ * @param overrides - Partial settings to apply
+ * @returns A complete AppConfig object
  */
-export function createConfig(overrides: Partial<AppConfig>): AppConfig {
-  const config = { ...defaultConfig, ...overrides };
-  if (!validateConfig(config)) {
-    throw new Error('invalid configuration values provided');
-  }
-  return config;
-}
+export const createConfig = (overrides: Partial<AppConfig>): AppConfig => {
+  return {
+    ...defaultConfig,
+    ...overrides
+  };
+};
