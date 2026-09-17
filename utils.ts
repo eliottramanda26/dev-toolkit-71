@@ -1,28 +1,32 @@
-export interface RetryOptions {
-  maxAttempts: number;
-  delayMs: number;
-}
+import winston from 'winston';
+import 'winston-daily-rotate-file';
 
 /**
- * Executes a function with exponential backoff retry logic.
+ * Configuration for application logging with rotation
+ * Retains logs for 14 days and limits size per file
  */
-export async function withRetry<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
-): Promise<T> {
-  let lastError: unknown;
+export const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.DailyRotateFile({
+      filename: 'logs/app-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '14d'
+    })
+  ]
+});
 
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
-    try {
-      return await operation();
-    } catch (err) {
-      lastError = err;
-      if (attempt < options.maxAttempts) {
-        const backoff = options.delayMs * Math.pow(2, attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, backoff));
-      }
-    }
-  }
+export const logInfo = (message: string, meta?: object) => {
+  logger.info(message, meta);
+};
 
-  throw lastError;
-}
+export const logError = (message: string, error?: Error) => {
+  logger.error(message, { error: error?.message, stack: error?.stack });
+};
