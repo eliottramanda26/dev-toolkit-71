@@ -1,40 +1,36 @@
-/**
- * Configuration interface for dev-toolkit-71 core modules
- */
-export interface ToolkitConfig {
-  readonly version: string;
-  readonly environment: 'development' | 'production' | 'test';
-  readonly retryAttempts: number;
-  readonly apiTimeout: number;
-  readonly enableLogging: boolean;
+export interface AppConfig {
+  env: string;
+  version: string;
+  timeout: number;
+  retries: number;
 }
 
 /**
- * Default application configuration object
+ * default application configuration settings
  */
-export const defaultConfig: ToolkitConfig = {
+export const defaultConfig: AppConfig = {
+  env: process.env.NODE_ENV || 'development',
   version: '1.0.0',
-  environment: 'development',
-  retryAttempts: 3,
-  apiTimeout: 5000,
-  enableLogging: true,
+  timeout: 5000,
+  retries: 3
 };
 
 /**
- * Merges partial config with default values
- * 
- * @param overrides Partial configuration options
- * @returns Complete ToolkitConfig object
+ * validates current configuration object
  */
-export const getConfiguration = (overrides: Partial<ToolkitConfig>): ToolkitConfig => {
-  return {
-    ...defaultConfig,
-    ...overrides,
-  };
-};
+export function validateConfig(config: AppConfig): boolean {
+  if (config.timeout < 0) return false;
+  if (config.retries < 0) return false;
+  return true;
+}
 
 /**
- * Constants for environment variables
+ * merges partial overrides into default config
  */
-export const APP_NAME: string = 'dev-toolkit-71';
-export const SUPPORTED_REGIONS: readonly string[] = ['us-east-1', 'eu-west-1'];
+export function createConfig(overrides: Partial<AppConfig>): AppConfig {
+  const config = { ...defaultConfig, ...overrides };
+  if (!validateConfig(config)) {
+    throw new Error('invalid configuration values provided');
+  }
+  return config;
+}
