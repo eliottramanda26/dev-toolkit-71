@@ -1,39 +1,36 @@
-interface ProcessingInput {
-  id: string;
-  value: number;
-  timestamp: number;
+export interface ServiceResponse<T> {
+  data: T | null;
+  error: string | null;
 }
 
-/**
- * Validates processing inputs against business rules
- */
-function validateInput(input: unknown): input is ProcessingInput {
-  if (!input || typeof input !== 'object') return false;
-  const { id, value, timestamp } = input as any;
+export class DataService {
+  private baseUrl: string;
 
-  return (
-    typeof id === 'string' && id.length > 0 &&
-    typeof value === 'number' && value >= 0 &&
-    typeof timestamp === 'number' && timestamp <= Date.now()
-  );
-}
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
 
-/**
- * Main processing loop for dev-toolkit-71 operations
- */
-export function processDataStream(inputs: unknown[]): void {
-  for (const entry of inputs) {
-    if (!validateInput(entry)) {
-      console.error('Invalid schema detected in stream, skipping:', entry);
-      continue;
-    }
-
+  public async fetchData<T>(endpoint: string): Promise<ServiceResponse<T>> {
     try {
-      // Execute business logic for valid inputs
-      const result = entry.value * 1.05;
-      console.log(`Processed id ${entry.id}: ${result}`);
+      const response = await fetch(`${this.baseUrl}/${endpoint}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data: T = await response.json();
+      return { data, error: null };
     } catch (err) {
-      console.error(`Execution failure for ${entry.id}:`, err);
+      return { 
+        data: null, 
+        error: err instanceof Error ? err.message : 'unknown error' 
+      };
     }
   }
+
+  public formatPayload(input: Record<string, any>): string {
+    return JSON.stringify({ ...input, timestamp: Date.now() });
+  }
 }
+
+export const createService = (url: string): DataService => {
+  return new DataService(url);
+};
