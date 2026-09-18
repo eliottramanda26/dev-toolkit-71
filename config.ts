@@ -1,43 +1,37 @@
-/**
- * Configuration interface for application environment settings.
- */
-export interface AppConfig {
-  readonly port: number;
-  readonly environment: 'development' | 'staging' | 'production';
-  readonly apiEndpoint: string;
-  readonly timeoutMs: number;
-}
+import { createLogger, format, transports, Logger } from 'winston';
+import 'winston-daily-rotate-file';
+import { resolve } from 'path';
+
+const logDir = resolve(__dirname, '../logs');
 
 /**
- * Default application settings used across dev-toolkit-71.
+ * Daily rotation transport configuration
+ * Keeps files for 14 days and max size of 20MB
  */
-export const defaultConfig: AppConfig = {
-  port: 3000,
-  environment: 'development',
-  apiEndpoint: 'https://api.dev-toolkit-71.internal',
-  timeoutMs: 5000
-};
+const transport = new (transports as any).DailyRotateFile({
+  filename: `${logDir}/app-%DATE%.log`,
+  datePattern: 'YYYY-MM-DD',
+  zippedArchive: true,
+  maxSize: '20m',
+  maxFiles: '14d'
+});
 
-/**
- * Validates that the provided configuration meets minimum requirements.
- * @param config - The application configuration object
- * @returns boolean indicating validity
- */
-export const validateConfig = (config: AppConfig): boolean => {
-  const isValidPort = config.port > 1024 && config.port <= 65535;
-  const isValidEndpoint = config.apiEndpoint.startsWith('https://');
-
-  return isValidPort && isValidEndpoint;
-};
-
-/**
- * Merges partial config overrides into the default configuration.
- * @param overrides - Partial settings to apply
- * @returns A complete AppConfig object
- */
-export const createConfig = (overrides: Partial<AppConfig>): AppConfig => {
-  return {
-    ...defaultConfig,
-    ...overrides
-  };
-};
+export const logger: Logger = createLogger({
+  level: 'info',
+  format: format.combine(
+    format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    format.errors({ stack: true }),
+    format.splat(),
+    format.json()
+  ),
+  defaultMeta: { service: 'dev-toolkit-71' },
+  transports: [
+    transport,
+    new transports.Console({
+      format: format.combine(
+        format.colorize(),
+        format.simple()
+      )
+    })
+  ]
+});
