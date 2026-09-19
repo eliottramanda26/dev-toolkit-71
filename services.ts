@@ -1,61 +1,41 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-export interface LoggerOptions {
-  logDir: string;
-  maxFileSize?: number; // in bytes
-  maxFiles?: number;
+export interface DataServiceConfig {
+  endpoint: string;
+  timeout: number;
 }
 
-export class RotatingLogger {
-  private logDir: string;
-  private maxFileSize: number;
-  private maxFiles: number;
-  private currentFilePath: string;
+/**
+ * Represents a standard response structure for API interactions
+ */
+export interface ApiResponse<T> {
+  data: T | null;
+  error: string | null;
+  timestamp: number;
+}
 
-  constructor(options: LoggerOptions) {
-    this.logDir = options.logDir;
-    this.maxFileSize = options.maxFileSize || 1024 * 1024; // Default 1MB
-    this.maxFiles = options.maxFiles || 5;
-    this.currentFilePath = path.join(this.logDir, 'app.log');
+/**
+ * Fetches generic resources from a remote service
+ * @param url Resource locator
+ * @param config Configuration for the request timeout
+ */
+export async function fetchData<T>(url: string, config: DataServiceConfig): Promise<ApiResponse<T>> {
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), config.timeout);
 
-    if (!fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
+    const response = await fetch(`${config.endpoint}${url}`, {
+      signal: controller.signal
+    });
+
+    clearTimeout(id);
+
+    if (!response.ok) {
+      return { data: null, error: `Request failed with status ${response.status}`, timestamp: Date.now() };
     }
+
+    const data: T = await response.json();
+    return { data, error: null, timestamp: Date.now() };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown network error';
+    return { data: null, error: message, timestamp: Date.now() };
   }
-
-  private rotate(): void {
-    for (let i = this.maxFiles - 1; i >= 1; i--) {
-      const oldPath = path.join(this.logDir, `app.${i}.log`);
-      const newPath = path.join(this.logDir, `app.${i + 1}.log`);
-      if (fs.existsSync(oldPath)) {
-        if (i + 1 > this.maxFiles) {
-          fs.unlinkSync(oldPath);
-        } else {
-          fs.renameSync(oldPath, newPath);
-        }
-      }
-    }
-    if (fs.existsSync(this.currentFilePath)) {
-      fs.renameSync(this.currentFilePath, path.join(this.logDir, 'app.1.log'));
-    }
-  }
-
-  public log(level: 'INFO' | 'WARN' | 'ERROR', message: string): void {
-    const timestamp = new Date().toISOString();
-    const logLine = `[${timestamp}] [${level}] ${message}\n`;
-
-    if (fs.existsSync(this.currentFilePath)) {
-      const stats = fs.statSync(this.currentFilePath);
-      if (stats.size >= this.maxFileSize) {
-        this.rotate();
-      }
-    }
-
-    fs.appendFileSync(this.currentFilePath, logLine, 'utf8');
-  }
-
-  public info(message: string): void { this.log('INFO', message); }
-  public warn(message: string): void { this.log('WARN', message); }
-  public error(message: string): void { this.log('ERROR', message); }
 }
