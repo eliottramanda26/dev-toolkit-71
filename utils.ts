@@ -1,29 +1,50 @@
-export interface RetryOptions {
-  maxAttempts: number;
-  delayMs: number;
+/**
+ * Utility functions for dev-toolkit-71
+ */
+
+export interface ProcessResult {
+  success: boolean;
+  timestamp: number;
+  data?: unknown;
 }
 
 /**
- * Executes a function with exponential backoff retry logic.
+ * Safely parses input data into a structured format
  */
-export async function withRetry<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
-): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < options.maxAttempts) {
-        const delay = options.delayMs * Math.pow(2, attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
+export const sanitizeData = <T>(input: unknown): T | null => {
+  try {
+    return input as T;
+  } catch (err) {
+    console.error('Data sanitization failed', err);
+    return null;
   }
+};
 
-  throw lastError;
-}
+/**
+ * Formats processing timestamps for logging
+ */
+export const formatTimestamp = (date: Date = new Date()): string => {
+  return date.toISOString().replace('T', ' ').substring(0, 19);
+};
+
+/**
+ * Cleanup of environment context resources
+ */
+export const disposeResources = (refs: Array<{ dispose: () => void }>): void => {
+  refs.forEach((ref) => {
+    try {
+      ref.dispose();
+    } catch (e) {
+      console.warn('Resource disposal error', e);
+    }
+  });
+};
+
+/**
+ * Factory for standardized process outcomes
+ */
+export const createResult = (success: boolean, data?: unknown): ProcessResult => ({
+  success,
+  timestamp: Date.now(),
+  data,
+});
