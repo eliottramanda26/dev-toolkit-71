@@ -1,33 +1,26 @@
-/**
- * Configuration interface for application environment settings
- */
 export interface AppConfig {
-  readonly apiUrl: string;
-  readonly timeoutMs: number;
-  readonly retryAttempts: number;
-  readonly environment: 'development' | 'staging' | 'production';
+  port: number;
+  environment: 'development' | 'production';
+  debug: boolean;
 }
 
-/**
- * Application default configuration constants
- */
-export const config: AppConfig = {
-  apiUrl: process.env.API_URL || 'https://api.dev-toolkit-71.com',
-  timeoutMs: 5000,
-  retryAttempts: 3,
-  environment: (process.env.NODE_ENV as AppConfig['environment']) || 'development',
+const defaults: AppConfig = {
+  port: 3000,
+  environment: 'development',
+  debug: false,
 };
 
 /**
- * Type guard for environment validation
+ * Merges user-provided settings with default configuration values
  */
-export const isProduction = (env: AppConfig['environment']): boolean => {
-  return env === 'production';
-};
+export function loadConfig(userConfig: Partial<AppConfig> = {}): AppConfig {
+  return {
+    ...defaults,
+    ...userConfig,
+  };
+}
 
-/**
- * Returns a formatted timeout duration based on environment
- */
-export const getRequestTimeout = (cfg: AppConfig): number => {
-  return isProduction(cfg.environment) ? cfg.timeoutMs : cfg.timeoutMs * 2;
-};
+export const config = loadConfig(typeof process !== 'undefined' ? {
+  port: Number(process.env.PORT),
+  environment: process.env.NODE_ENV as any,
+} : {});
