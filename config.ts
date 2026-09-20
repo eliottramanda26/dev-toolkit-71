@@ -1,25 +1,33 @@
+import { readFileSync } from 'fs';
+
 export interface AppConfig {
   port: number;
-  env: 'development' | 'production';
+  host: string;
   debug: boolean;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   port: 3000,
-  env: 'development',
+  host: 'localhost',
   debug: false,
 };
 
 /**
- * Merges partial user config with sensible defaults
+ * Merges file-based configuration with provided defaults
  */
-export function loadConfig(userConfig: Partial<AppConfig> = {}): AppConfig {
-  return {
-    ...DEFAULT_CONFIG,
-    ...userConfig,
-  };
+export function loadConfig(path: string): AppConfig {
+  try {
+    const fileData = readFileSync(path, 'utf-8');
+    const parsed: Partial<AppConfig> = JSON.parse(fileData);
+    
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed
+    };
+  } catch (error) {
+    console.error('Config file missing or invalid, using defaults');
+    return DEFAULT_CONFIG;
+  }
 }
 
-// Usage example:
-// const config = loadConfig({ port: 8080 });
-// console.log(`Starting server on port ${config.port}`);
+export const config = loadConfig('./config.json');
