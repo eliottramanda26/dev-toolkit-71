@@ -1,32 +1,37 @@
-export interface RetryOptions {
-  maxAttempts: number;
-  delayMs: number;
+/**
+ * Safe object deep property access
+ */
+export function getDeepValue<T = any>(obj: any, path: string, fallback?: T): T | undefined {
+  if (!obj || typeof path !== 'string') return fallback;
+
+  const value = path.split('.').reduce((acc, part) => {
+    return acc && typeof acc === 'object' ? acc[part] : undefined;
+  }, obj);
+
+  return value !== undefined ? value : fallback;
 }
 
 /**
- * Executes a function with exponential backoff retry logic
+ * Generic delay for async operations
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
-): Promise<T> {
-  let lastError: unknown;
+export const delay = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
 
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < options.maxAttempts) {
-        const delay = options.delayMs * Math.pow(2, attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  }
-
-  throw lastError;
+/**
+ * Type-safe array unique transformation
+ */
+export function uniqueArray<T>(items: T[]): T[] {
+  return Array.from(new Set(items));
 }
 
-export const delay = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Data validation for empty checks
+ */
+export function isEmpty(value: any): boolean {
+  if (value === null || value === undefined) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === 'string') return value.trim().length === 0;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
+  return false;
+}
