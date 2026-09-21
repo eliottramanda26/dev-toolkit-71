@@ -1,33 +1,31 @@
-import { readFileSync } from 'fs';
-
 export interface AppConfig {
-  port: number;
-  host: string;
-  debug: boolean;
+  apiBaseUrl: string;
+  timeout: number;
 }
 
-const DEFAULT_CONFIG: AppConfig = {
-  port: 3000,
-  host: 'localhost',
-  debug: false,
+export const validateConfig = (config: unknown): AppConfig => {
+  if (typeof config !== 'object' || config === null) {
+    throw new Error('Invalid configuration: object expected');
+  }
+
+  const { apiBaseUrl, timeout } = config as Record<string, unknown>;
+
+  if (typeof apiBaseUrl !== 'string' || apiBaseUrl.length === 0) {
+    throw new Error('Configuration error: apiBaseUrl must be a non-empty string');
+  }
+
+  if (typeof timeout !== 'number' || timeout <= 0) {
+    throw new Error('Configuration error: timeout must be a positive number');
+  }
+
+  return { apiBaseUrl, timeout };
 };
 
-/**
- * Merges file-based configuration with provided defaults
- */
-export function loadConfig(path: string): AppConfig {
+export const loadConfig = (raw: unknown): AppConfig => {
   try {
-    const fileData = readFileSync(path, 'utf-8');
-    const parsed: Partial<AppConfig> = JSON.parse(fileData);
-    
-    return {
-      ...DEFAULT_CONFIG,
-      ...parsed
-    };
+    return validateConfig(raw);
   } catch (error) {
-    console.error('Config file missing or invalid, using defaults');
-    return DEFAULT_CONFIG;
+    console.error('Failed to initialize application configuration:', error instanceof Error ? error.message : 'Unknown error');
+    throw error;
   }
-}
-
-export const config = loadConfig('./config.json');
+};
