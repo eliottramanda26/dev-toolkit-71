@@ -1,5 +1,5 @@
 /**
- * dev-toolkit-71 helper functions
+ * Utility functions for dev-toolkit-71
  */
 
 export const debounce = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
@@ -10,26 +10,22 @@ export const debounce = <T extends (...args: any[]) => void>(fn: T, delay: numbe
   };
 };
 
-export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]) => {
-  return keys.reduce((acc, key) => {
-    if (key in obj) acc[key] = obj[key];
-    return acc;
-  }, {} as Pick<T, K>);
+export const sleep = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
+  const result = {} as Pick<T, K>;
+  keys.forEach((key) => {
+    if (key in obj) result[key] = obj[key];
+  });
+  return result;
 };
 
-export const sleep = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
-
-export const groupBy = <T>(array: T[], key: keyof T): Record<string, T[]> => {
-  return array.reduce((result, item) => {
-    const groupKey = String(item[key]);
-    if (!result[groupKey]) result[groupKey] = [];
-    result[groupKey].push(item);
-    return result;
-  }, {} as Record<string, T[]>);
-};
-
-export const isNotEmpty = <T>(value: T | null | undefined): value is T => {
+export const isDefined = <T>(value: T | null | undefined): value is T => {
   return value !== null && value !== undefined;
+};
+
+export const capitalize = (str: string): string => {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
 };
