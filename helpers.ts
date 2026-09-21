@@ -1,31 +1,35 @@
-import * as fs from 'fs';
-import * as path from 'path';
+/**
+ * dev-toolkit-71 helper functions
+ */
 
-interface LoggerConfig {
-  logDir: string;
-  maxSizeMb: number;
-}
-
-export const setupLogger = (config: LoggerConfig) => {
-  if (!fs.existsSync(config.logDir)) {
-    fs.mkdirSync(config.logDir, { recursive: true });
-  }
-
-  const logPath = path.join(config.logDir, 'app.log');
-
-  const rotateLogs = () => {
-    if (fs.existsSync(logPath)) {
-      const stats = fs.statSync(logPath);
-      if (stats.size > config.maxSizeMb * 1024 * 1024) {
-        const timestamp = new Date().getTime();
-        fs.renameSync(logPath, path.join(config.logDir, `app-${timestamp}.log`));
-      }
-    }
+export const debounce = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
   };
+};
 
-  return (message: string) => {
-    rotateLogs();
-    const entry = `[${new Date().toISOString()}] ${message}\n`;
-    fs.appendFileSync(logPath, entry);
-  };
+export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]) => {
+  return keys.reduce((acc, key) => {
+    if (key in obj) acc[key] = obj[key];
+    return acc;
+  }, {} as Pick<T, K>);
+};
+
+export const sleep = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+export const groupBy = <T>(array: T[], key: keyof T): Record<string, T[]> => {
+  return array.reduce((result, item) => {
+    const groupKey = String(item[key]);
+    if (!result[groupKey]) result[groupKey] = [];
+    result[groupKey].push(item);
+    return result;
+  }, {} as Record<string, T[]>);
+};
+
+export const isNotEmpty = <T>(value: T | null | undefined): value is T => {
+  return value !== null && value !== undefined;
 };
