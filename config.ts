@@ -1,31 +1,35 @@
-export interface AppConfig {
-  apiBaseUrl: string;
-  timeout: number;
+import fs from 'fs';
+
+interface AppConfig {
+  port: number;
+  host: string;
+  debug: boolean;
 }
 
-export const validateConfig = (config: unknown): AppConfig => {
-  if (typeof config !== 'object' || config === null) {
-    throw new Error('Invalid configuration: object expected');
-  }
-
-  const { apiBaseUrl, timeout } = config as Record<string, unknown>;
-
-  if (typeof apiBaseUrl !== 'string' || apiBaseUrl.length === 0) {
-    throw new Error('Configuration error: apiBaseUrl must be a non-empty string');
-  }
-
-  if (typeof timeout !== 'number' || timeout <= 0) {
-    throw new Error('Configuration error: timeout must be a positive number');
-  }
-
-  return { apiBaseUrl, timeout };
+const DEFAULT_CONFIG: AppConfig = {
+  port: 3000,
+  host: 'localhost',
+  debug: false,
 };
 
-export const loadConfig = (raw: unknown): AppConfig => {
+/**
+ * Loads configuration from a JSON file and merges with defaults
+ */
+export function loadConfig(configPath: string): AppConfig {
   try {
-    return validateConfig(raw);
+    if (!fs.existsSync(configPath)) {
+      return { ...DEFAULT_CONFIG };
+    }
+
+    const fileContent = fs.readFileSync(configPath, 'utf-8');
+    const parsed: Partial<AppConfig> = JSON.parse(fileContent);
+
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+    };
   } catch (error) {
-    console.error('Failed to initialize application configuration:', error instanceof Error ? error.message : 'Unknown error');
-    throw error;
+    console.error('Failed to load config, falling back to defaults', error);
+    return { ...DEFAULT_CONFIG };
   }
-};
+}
