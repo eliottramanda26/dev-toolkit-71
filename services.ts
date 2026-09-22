@@ -1,38 +1,42 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-interface LoggerOptions {
-  logDir: string;
-  maxSizeMB: number;
+export interface ServiceResponse<T> {
+  data: T | null;
+  error: string | null;
+  timestamp: number;
 }
 
-export const setupLogger = (options: LoggerOptions) => {
-  const logFile = path.join(options.logDir, 'app.log');
-
-  if (!fs.existsSync(options.logDir)) {
-    fs.mkdirSync(options.logDir, { recursive: true });
+/**
+ * generic fetch wrapper for dev-toolkit-71
+ */
+export async function fetchData<T>(url: string): Promise<ServiceResponse<T>> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+    const data = await response.json();
+    return { data, error: null, timestamp: Date.now() };
+  } catch (err) {
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : 'Unknown error',
+      timestamp: Date.now(),
+    };
   }
+}
 
-  const rotateLogs = () => {
-    if (fs.existsSync(logFile)) {
-      const stats = fs.statSync(logFile);
-      if (stats.size > options.maxSizeMB * 1024 * 1024) {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        fs.renameSync(logFile, path.join(options.logDir, `app-${timestamp}.log`));
-      }
-    }
-  };
+/**
+ * batch process for service normalization
+ */
+export function normalizeData<T>(items: T[]): T[] {
+  return items.filter((item) => item !== null && item !== undefined);
+}
 
-  return {
-    log: (message: string) => {
-      rotateLogs();
-      const entry = `[${new Date().toISOString()}] ${message}\n`;
-      fs.appendFileSync(logFile, entry);
-    }
-  };
+/**
+ * central service configuration management
+ */
+export const ServiceConfig = {
+  timeout: 5000,
+  retries: 3,
+  endpoints: {
+    api: 'https://api.dev-toolkit-71.io',
+    status: '/health',
+  },
 };
-
-export const logger = setupLogger({
-  logDir: './logs',
-  maxSizeMB: 5
-});
