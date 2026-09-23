@@ -1,31 +1,34 @@
+interface ProcessInput {
+  id: string;
+  value: number;
+  timestamp: number;
+}
+
 /**
- * Utility functions for dev-toolkit-71
+ * validates structure and constraints of input data
+ * ensures values are within acceptable business ranges
  */
+export const validateInput = (input: unknown): input is ProcessInput => {
+  if (typeof input !== 'object' || input === null) return false;
 
-export const debounce = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
+  const { id, value, timestamp } = input as Record<string, unknown>;
+
+  const isValidId = typeof id === 'string' && id.length > 0;
+  const isValidValue = typeof value === 'number' && value >= 0 && value <= 1000;
+  const isValidTimestamp = typeof timestamp === 'number' && timestamp > 0;
+
+  return isValidId && isValidValue && isValidTimestamp;
 };
 
-export const sleep = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
-  const result = {} as Pick<T, K>;
-  keys.forEach((key) => {
-    if (key in obj) result[key] = obj[key];
-  });
-  return result;
-};
-
-export const isDefined = <T>(value: T | null | undefined): value is T => {
-  return value !== null && value !== undefined;
-};
-
-export const capitalize = (str: string): string => {
-  if (!str) return '';
-  return str.charAt(0).toUpperCase() + str.slice(1);
+/**
+ * safe execution wrapper for the processing loop
+ */
+export const processWithValidation = (batch: unknown[], handler: (item: ProcessInput) => void): void => {
+  for (const item of batch) {
+    if (validateInput(item)) {
+      handler(item);
+    } else {
+      console.error('validation failure for item:', item);
+    }
+  }
 };
