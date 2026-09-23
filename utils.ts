@@ -1,36 +1,39 @@
-export interface RetryOptions {
-  maxAttempts: number;
-  delayMs: number;
-}
-
 /**
- * Retries an asynchronous operation with a linear backoff.
+ * Deep merge utility for configuration objects
  */
-export async function withRetry<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
-): Promise<T> {
-  let lastError: unknown;
+export function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
+  const output = { ...target };
 
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
-    try {
-      return await operation();
-    } catch (err) {
-      lastError = err;
-      if (attempt < options.maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+  for (const key in source) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      const value = source[key];
+
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        output[key] = key in target ? deepMerge(target[key], value) : value;
+      } else {
+        output[key] = value as any;
       }
     }
   }
 
-  throw lastError instanceof Error 
-    ? lastError 
-    : new Error(`Operation failed after ${options.maxAttempts} attempts: ${String(lastError)}`);
+  return output;
 }
 
 /**
- * Checks if an error appears to be network-related.
+ * Safe object property getter with optional chaining fallback
  */
-export function isNetworkError(err: unknown): boolean {
-  return err instanceof TypeError && err.message.includes('fetch');
+export function getSafe<T, K extends keyof T>(obj: T | null | undefined, key: K, fallback: T[K]): T[K] {
+  return (obj && obj[key] !== undefined) ? obj[key] : fallback;
+}
+
+/**
+ * Sanitizes data by removing undefined values
+ */
+export function cleanObject<T extends Record<string, any>>(obj: T): Partial<T> {
+  return Object.entries(obj).reduce((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key as keyof T] = value;
+    }
+    return acc;
+  }, {} as Partial<T>);
 }
