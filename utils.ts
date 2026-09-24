@@ -1,39 +1,46 @@
 /**
- * Deep merge utility for configuration objects
+ * Configuration constants for the toolkit
  */
-export function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
-  const output = { ...target };
+export const DEFAULT_TIMEOUT: number = 5000;
 
-  for (const key in source) {
-    if (Object.prototype.hasOwnProperty.call(source, key)) {
-      const value = source[key];
-
-      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-        output[key] = key in target ? deepMerge(target[key], value) : value;
-      } else {
-        output[key] = value as any;
-      }
-    }
-  }
-
-  return output;
+/**
+ * Formats a given string input into a standard lowercase slug
+ * @param input - The raw string to slugify
+ * @returns The formatted string
+ */
+export function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 /**
- * Safe object property getter with optional chaining fallback
+ * Deeply checks if an object is empty
+ * @param obj - The object to evaluate
+ * @returns Boolean result of emptiness check
  */
-export function getSafe<T, K extends keyof T>(obj: T | null | undefined, key: K, fallback: T[K]): T[K] {
-  return (obj && obj[key] !== undefined) ? obj[key] : fallback;
+export function isEmpty(obj: Record<string, unknown>): boolean {
+  return Object.keys(obj).length === 0 && obj.constructor === Object;
 }
 
 /**
- * Sanitizes data by removing undefined values
+ * Pauses execution for a set duration
+ * @param ms - Milliseconds to wait
+ * @returns Promise that resolves after timeout
  */
-export function cleanObject<T extends Record<string, any>>(obj: T): Partial<T> {
-  return Object.entries(obj).reduce((acc, [key, value]) => {
-    if (value !== undefined) {
-      acc[key as keyof T] = value;
+export function delay(ms: number = DEFAULT_TIMEOUT): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Validates environment variables presence
+ * @param keys - Array of keys to verify
+ */
+export function validateEnv(keys: string[]): void {
+  keys.forEach((key) => {
+    if (!process.env[key]) {
+      throw new Error(`Missing environment variable: ${key}`);
     }
-    return acc;
-  }, {} as Partial<T>);
+  });
 }
