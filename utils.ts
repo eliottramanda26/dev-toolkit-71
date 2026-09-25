@@ -1,32 +1,39 @@
-import { createLogger, format, transports, Logger } from 'winston';
-import 'winston-daily-rotate-file';
+export class AppError extends Error {
+  constructor(public message: string, public code: string, public status: number = 500) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
 
-/**
- * Configuration for logger instance
- * daily rotation setup with 14 day retention
- */
-export const logger: Logger = createLogger({
-  level: 'info',
-  format: format.combine(
-    format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    format.json()
-  ),
-  transports: [
-    new transports.Console(),
-    new transports.DailyRotateFile({
-      filename: 'logs/application-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      zippedArchive: true,
-      maxSize: '20m',
-      maxFiles: '14d'
-    })
-  ]
-});
-
-export const logError = (msg: string, meta?: any): void => {
-  logger.error(msg, { meta });
+export const safeExecute = async <T>(fn: () => Promise<T>): Promise<T | null> => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) {
+      console.error(`[${error.code}] ${error.message}`);
+    } else if (error instanceof Error) {
+      console.error(`[UNKNOWN_ERROR] ${error.message}`);
+    }
+    return null;
+  }
 };
 
-export const logInfo = (msg: string, meta?: any): void => {
-  logger.info(msg, { meta });
+export const validateConfig = (config: Record<string, unknown>): void => {
+  if (!config || Object.keys(config).length === 0) {
+    throw new AppError('Empty configuration provided', 'INVALID_CONFIG', 400);
+  }
+};
+
+export const retryOperation = async <T>(
+  fn: () => Promise<T>,
+  retries: number = 3
+): Promise<T> => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === retries - 1) throw err;
+    }
+  }
+  throw new AppError('Operation failed after retries', 'RETRY_LIMIT_EXCEEDED');
 };
