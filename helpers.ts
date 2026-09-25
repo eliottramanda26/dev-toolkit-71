@@ -1,60 +1,31 @@
 /**
- * Utility helper functions for general operations in dev-toolkit-71.
+ * dev-toolkit-71 helper utilities
  */
 
-/**
- * Splits an array into smaller chunks of a specified size.
- */
-export function chunk<T>(array: T[], size: number): T[][] {
-  if (size <= 0) return [];
-  const result: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    result.push(array.slice(i, i + size));
-  }
-  return result;
-}
+export const sleep = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Truncates a string to a specified length and appends a suffix if trimmed.
- */
-export function truncate(str: string, maxLength: number, suffix: string = "..."): string {
-  if (str.length <= maxLength) return str;
-  const targetLength = Math.max(0, maxLength - suffix.length);
-  return str.slice(0, targetLength) + suffix;
-}
+export const chunkArray = <T>(array: T[], size: number): T[][] => {
+  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
+    array.slice(i * size, i * size + size)
+  );
+};
 
-/**
- * Retries an asynchronous function a given number of times with an optional delay.
- */
-export async function retry<T>(
-  fn: () => Promise<T>,
-  retries: number = 3,
-  delayMs: number = 200
-): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      if (attempt < retries && delayMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-    }
-  }
-  throw lastError;
-}
-
-/**
- * Creates a debounced version of a function that delays execution.
- */
-export function debounce<T extends (...args: any[]) => void>(
-  fn: T,
-  delayMs: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+export const debounce = <T extends (...args: any[]) => any>(
+  fn: T, 
+  delay: number
+): (...args: Parameters<T>) => void => {
+  let timeoutId: ReturnType<typeof setTimeout>;
   return (...args: Parameters<T>) => {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delayMs);
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
   };
-}
+};
+
+export const getObjectKeys = <T extends object>(obj: T): (keyof T)[] => {
+  return Object.keys(obj) as (keyof T)[];
+};
+
+export const isNotEmpty = <T>(value: T | null | undefined): value is T => {
+  return value !== null && value !== undefined;
+};
