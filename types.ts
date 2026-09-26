@@ -1,45 +1,40 @@
 /**
- * Core interface definitions for dev-toolkit-71
+ * Core domain interfaces for dev-toolkit-71
  */
 
 export interface ToolkitConfig {
-  version: string;
-  environment: 'development' | 'production' | 'test';
-  debugMode: boolean;
+  readonly version: string;
+  readonly environment: 'development' | 'production' | 'test';
+  readonly debug: boolean;
 }
 
-export interface OperationResult<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  timestamp: number;
+export interface ProcessResult<T> {
+  readonly success: boolean;
+  readonly data?: T;
+  readonly error?: string;
+  readonly timestamp: number;
 }
 
-export type LoggerLevel = 'info' | 'warn' | 'error' | 'debug';
-
-export interface LogEntry {
-  level: LoggerLevel;
-  message: string;
-  context?: Record<string, unknown>;
-}
-
-export interface FileMetadata {
-  path: string;
-  size: number;
-  lastModified: Date;
-  extension: string;
+export interface ResourceNode {
+  readonly id: string;
+  readonly path: string;
+  readonly metadata: Record<string, unknown>;
 }
 
 export type Nullable<T> = T | null | undefined;
 
-export interface ProcessOptions {
-  timeout?: number;
-  retries?: number;
-  force?: boolean;
+export interface RegistryMap {
+  [key: string]: ResourceNode;
 }
 
-export const DEFAULT_CONFIG: ToolkitConfig = {
-  version: '1.0.0',
-  environment: 'development',
-  debugMode: false
-};
+export const createResult = <T>(data: T): ProcessResult<T> => ({
+  success: true,
+  data,
+  timestamp: Date.now(),
+});
+
+export const createError = (message: string): ProcessResult<never> => ({
+  success: false,
+  error: message,
+  timestamp: Date.now(),
+});
