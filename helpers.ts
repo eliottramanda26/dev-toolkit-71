@@ -1,31 +1,46 @@
 /**
- * dev-toolkit-71 helper utilities
+ * dev-toolkit-71: general utility helpers for data manipulation
  */
 
-export const sleep = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
+export type Nullable<T> = T | null | undefined;
 
-export const chunkArray = <T>(array: T[], size: number): T[][] => {
-  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
-    array.slice(i * size, i * size + size)
-  );
-};
+/**
+ * Safely deep clones a plain object using structuredClone
+ */
+export function cloneData<T>(data: T): T {
+  return structuredClone(data);
+}
 
-export const debounce = <T extends (...args: any[]) => any>(
-  fn: T, 
-  delay: number
-): (...args: Parameters<T>) => void => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
-};
+/**
+ * Removes null or undefined keys from an object
+ */
+export function stripEmpty<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result = { ...obj };
+  for (const key in result) {
+    if (result[key] === null || result[key] === undefined) {
+      delete result[key];
+    }
+  }
+  return result;
+}
 
-export const getObjectKeys = <T extends object>(obj: T): (keyof T)[] => {
-  return Object.keys(obj) as (keyof T)[];
-};
+/**
+ * Groups an array of objects by a specific property key
+ */
+export function groupBy<T extends Record<string, any>>(arr: T[], key: keyof T): Record<string, T[]> {
+  return arr.reduce((acc, item) => {
+    const group = String(item[key]);
+    if (!acc[group]) {
+      acc[group] = [];
+    }
+    acc[group].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
+}
 
-export const isNotEmpty = <T>(value: T | null | undefined): value is T => {
-  return value !== null && value !== undefined;
-};
+/**
+ * Checks if a value is a non-null object
+ */
+export function isObject(value: unknown): value is Record<string, any> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
