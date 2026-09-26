@@ -1,39 +1,45 @@
-export class AppError extends Error {
-  constructor(public message: string, public code: string, public status: number = 500) {
-    super(message);
-    this.name = 'AppError';
-  }
+export interface RetryOptions {
+  retries?: number;
+  delay?: number;
+  backoffFactor?: number;
+  shouldRetry?: (error: unknown) => boolean;
 }
 
-export const safeExecute = async <T>(fn: () => Promise<T>): Promise<T | null> => {
-  try {
-    return await fn();
-  } catch (error) {
-    if (error instanceof AppError) {
-      console.error(`[${error.code}] ${error.message}`);
-    } else if (error instanceof Error) {
-      console.error(`[UNKNOWN_ERROR] ${error.message}`);
-    }
-    return null;
-  }
-};
+/**
+ * Executes an asynchronous task with exponential backoff retry logic.
+ *
+ * @param operation - The async function to attempt
+ * @param options - Retry behavior customization
+ */
+export async function retryOperation<T>(
+  operation: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const {
+    retries = 3,
+    delay = 1000,
+    backoffFactor = 2,
+    shouldRetry = () => true,
+  } = options;
 
-export const validateConfig = (config: Record<string, unknown>): void => {
-  if (!config || Object.keys(config).length === 0) {
-    throw new AppError('Empty configuration provided', 'INVALID_CONFIG', 400);
-  }
-};
+  let lastError: unknown;
+  let currentDelay = delay;
 
-export const retryOperation = async <T>(
-  fn: () => Promise<T>,
-  retries: number = 3
-): Promise<T> => {
-  for (let i = 0; i < retries; i++) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await fn();
-    } catch (err) {
-      if (i === retries - 1) throw err;
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      // Stop retrying if max limit reached or error condition fails
+      if (attempt === retries || !shouldRetry(error)) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, currentDelay));
+      currentDelay *= backoffFactor;
     }
   }
-  throw new AppError('Operation failed after retries', 'RETRY_LIMIT_EXCEEDED');
-};
+
+  throw lastError;
+}
