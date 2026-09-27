@@ -1,46 +1,35 @@
 /**
- * dev-toolkit-71: general utility helpers for data manipulation
+ * Utility functions for dev-toolkit-71 operations
  */
 
-export type Nullable<T> = T | null | undefined;
+export const debounce = <T extends (...args: any[]) => void>(func: T, delay: number) => {
+  let timer: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => func(...args), delay);
+  };
+};
 
-/**
- * Safely deep clones a plain object using structuredClone
- */
-export function cloneData<T>(data: T): T {
-  return structuredClone(data);
-}
+export const sleep = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
 
-/**
- * Removes null or undefined keys from an object
- */
-export function stripEmpty<T extends Record<string, any>>(obj: T): Partial<T> {
-  const result = { ...obj };
-  for (const key in result) {
-    if (result[key] === null || result[key] === undefined) {
-      delete result[key];
-    }
+export const isDefined = <T>(value: T | null | undefined): value is T => {
+  return value !== null && value !== undefined;
+};
+
+export const chunkArray = <T>(array: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
   }
-  return result;
-}
+  return chunks;
+};
 
-/**
- * Groups an array of objects by a specific property key
- */
-export function groupBy<T extends Record<string, any>>(arr: T[], key: keyof T): Record<string, T[]> {
-  return arr.reduce((acc, item) => {
-    const group = String(item[key]);
-    if (!acc[group]) {
-      acc[group] = [];
-    }
-    acc[group].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
-}
-
-/**
- * Checks if a value is a non-null object
- */
-export function isObject(value: unknown): value is Record<string, any> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+export const getEnvironmentVariable = (key: string, fallback?: string): string => {
+  const value = process.env[key];
+  if (!value && !fallback) {
+    throw new Error(`Environment variable ${key} is missing`);
+  }
+  return value || fallback || '';
+};
