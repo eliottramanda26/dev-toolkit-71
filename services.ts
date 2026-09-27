@@ -1,37 +1,31 @@
-interface RetryOptions {
-  attempts: number;
-  delay: number;
+export interface DataService<T> {
+  fetchData(id: string): Promise<T | null>;
+  clearCache(): void;
 }
 
-/**
- * executes an asynchronous task with exponential backoff
- */
-export async function withRetry<T>(
-  task: () => Promise<T>,
-  options: RetryOptions = { attempts: 3, delay: 1000 }
-): Promise<T> {
-  let lastError: unknown;
+export class BaseDataService<T> implements DataService<T> {
+  private cache: Map<string, T> = new Map();
 
-  for (let i = 0; i < options.attempts; i++) {
+  async fetchData(id: string): Promise<T | null> {
+    if (this.cache.has(id)) {
+      return this.cache.get(id) || null;
+    }
+
     try {
-      return await task();
+      const response = await fetch(`/api/v1/resource/${id}`);
+      if (!response.ok) return null;
+      const data: T = await response.json();
+      this.cache.set(id, data);
+      return data;
     } catch (error) {
-      lastError = error;
-      if (i < options.attempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, options.delay * Math.pow(2, i)));
-      }
+      console.error(`service fetch error for ${id}:`, error);
+      return null;
     }
   }
 
-  throw lastError;
+  clearCache(): void {
+    this.cache.clear();
+  }
 }
 
-export const fetchWithRetry = async <T>(url: string, init?: RequestInit): Promise<T> => {
-  return withRetry(async () => {
-    const response = await fetch(url, init);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
-  });
-};
+export const createService = <T>(): DataService<T> => new BaseDataService<T>();
