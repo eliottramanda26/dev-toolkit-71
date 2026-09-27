@@ -1,35 +1,76 @@
 /**
- * Utility functions for dev-toolkit-71 operations
+ * Utility functions for object sanitization, deep merging, and safe property access.
  */
 
-export const debounce = <T extends (...args: any[]) => void>(func: T, delay: number) => {
-  let timer: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => func(...args), delay);
-  };
-};
+export interface ObjectCleanOptions {
+  removeNull?: boolean;
+  removeUndefined?: boolean;
+  removeEmptyStrings?: boolean;
+}
 
-export const sleep = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
+/**
+ * Recursively removes null, undefined, or empty values from an object.
+ */
+export function cleanObject<T extends Record<string, any>>(
+  obj: T,
+  options: ObjectCleanOptions = {}
+): Partial<T> {
+  const { removeNull = true, removeUndefined = true, removeEmptyStrings = false } = options;
 
-export const isDefined = <T>(value: T | null | undefined): value is T => {
-  return value !== null && value !== undefined;
-};
+  return Object.entries(obj).reduce((acc, [key, value]) => {
+    if (value === null && removeNull) return acc;
+    if (value === undefined && removeUndefined) return acc;
+    if (value === '' && removeEmptyStrings) return acc;
 
-export const chunkArray = <T>(array: T[], size: number): T[][] => {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const cleaned = cleanObject(value, options);
+      if (Object.keys(cleaned).length > 0) {
+        acc[key as keyof T] = cleaned as T[keyof T];
+      }
+    } else {
+      acc[key as keyof T] = value;
+    }
+
+    return acc;
+  }, {} as Partial<T>);
+}
+
+/**
+ * Safely accesses deeply nested properties within an object structure.
+ */
+export function getNestedValue<T>(obj: Record<string, any>, path: string, defaultValue?: T): T | undefined {
+  const keys = path.split('.');
+  let current: any = obj;
+
+  for (const key of keys) {
+    if (current === null || current === undefined) {
+      return defaultValue;
+    }
+    current = current[key];
   }
-  return chunks;
-};
 
-export const getEnvironmentVariable = (key: string, fallback?: string): string => {
-  const value = process.env[key];
-  if (!value && !fallback) {
-    throw new Error(`Environment variable ${key} is missing`);
-  }
-  return value || fallback || '';
-};
+  return current !== undefined ? (current as T) : defaultValue;
+}
+
+/**
+ * Deeply merges multiple objects into a new target without mutating inputs.
+ */
+export function mergeDeep<T extends Record<string, any>>(...objects: Partial<T>[]): T {
+  const isObject = (item: any): item is Record<string, any> =>
+    Boolean(item && typeof item === 'object' && !Array.isArray(item));
+
+  return objects.reduce((prev, obj) => {
+    if (!obj) return prev;
+    Object.keys(obj).forEach((key) => {
+      const pVal = prev[key];
+      const oVal = obj[key];
+
+      if (isObject(pVal) && isObject(oVal)) {
+        prev[key as keyof T] = mergeDeep(pVal, oVal);
+      } else if (oVal !== undefined) {
+        prev[key as keyof T] = oVal as T[keyof T];
+      }
+    });
+    return prev;
+  }, {} as T);
+}
