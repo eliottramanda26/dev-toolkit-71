@@ -1,45 +1,41 @@
-export interface RetryOptions {
-  retries?: number;
-  delay?: number;
-  backoffFactor?: number;
-  shouldRetry?: (error: unknown) => boolean;
-}
-
-/**
- * Executes an asynchronous task with exponential backoff retry logic.
- *
- * @param operation - The async function to attempt
- * @param options - Retry behavior customization
- */
-export async function retryOperation<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const {
-    retries = 3,
-    delay = 1000,
-    backoffFactor = 2,
-    shouldRetry = () => true,
-  } = options;
-
-  let lastError: unknown;
-  let currentDelay = delay;
-
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-
-      // Stop retrying if max limit reached or error condition fails
-      if (attempt === retries || !shouldRetry(error)) {
-        break;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, currentDelay));
-      currentDelay *= backoffFactor;
+export const memoize = <T, R>(fn: (arg: T) => R): (arg: T) => R => {
+  const cache = new Map<T, R>();
+  return (arg: T): R => {
+    if (cache.has(arg)) {
+      return cache.get(arg)!;
     }
-  }
+    const result = fn(arg);
+    cache.set(arg, result);
+    return result;
+  };
+};
 
-  throw lastError;
-}
+export const throttle = <T extends any[]>(fn: (...args: T) => void, limit: number) => {
+  let inThrottle = false;
+  return (...args: T) => {
+    if (!inThrottle) {
+      fn(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
+};
+
+export const debounce = <T extends any[]>(fn: (...args: T) => void, delay: number) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: T) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+};
+
+export const batchProcess = <T, R>(items: T[], fn: (batch: T[]) => Promise<R[]>, size: number = 100): Promise<R[]> => {
+  const results: R[] = [];
+  const execute = async (index: number): Promise<void> => {
+    if (index >= items.length) return;
+    const batch = items.slice(index, index + size);
+    results.push(...(await fn(batch)));
+    return execute(index + size);
+  };
+  return execute(0).then(() => results);
+};
