@@ -1,31 +1,41 @@
-export interface DataService<T> {
-  fetchData(id: string): Promise<T | null>;
-  clearCache(): void;
+/**
+ * General purpose data transformation utilities for dev-toolkit-71
+ */
+
+export type Nullable<T> = T | null | undefined;
+
+/**
+ * Deep clones a serializable object to ensure immutability
+ */
+export function deepClone<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
 }
 
-export class BaseDataService<T> implements DataService<T> {
-  private cache: Map<string, T> = new Map();
-
-  async fetchData(id: string): Promise<T | null> {
-    if (this.cache.has(id)) {
-      return this.cache.get(id) || null;
-    }
-
-    try {
-      const response = await fetch(`/api/v1/resource/${id}`);
-      if (!response.ok) return null;
-      const data: T = await response.json();
-      this.cache.set(id, data);
-      return data;
-    } catch (error) {
-      console.error(`service fetch error for ${id}:`, error);
-      return null;
-    }
-  }
-
-  clearCache(): void {
-    this.cache.clear();
-  }
+/**
+ * Safely accesses deeply nested properties with a default fallback
+ */
+export function getNestedValue<T>(obj: any, path: string[], defaultValue: T): T {
+  return path.reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj) ?? defaultValue;
 }
 
-export const createService = <T>(): DataService<T> => new BaseDataService<T>();
+/**
+ * Groups an array of objects by a specific key
+ */
+export function groupBy<T>(arr: T[], key: keyof T): Record<string, T[]> {
+  return arr.reduce((acc, item) => {
+    const groupKey = String(item[key]);
+    if (!acc[groupKey]) {
+      acc[groupKey] = [];
+    }
+    acc[groupKey].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
+}
+
+/**
+ * Normalizes input to an array to simplify iteration logic
+ */
+export function ensureArray<T>(input: Nullable<T | T[]>): T[] {
+  if (Array.isArray(input)) return input;
+  return input ? [input] : [];
+}
