@@ -1,72 +1,35 @@
-/**
- * Configuration management utilities for dev-toolkit-71.
- * Provides environment variable parsing, default settings, and type safety.
- */
+import fs from 'fs';
 
-export interface ToolkitConfig {
-  /** Application environment mode */
-  env: 'development' | 'staging' | 'production' | 'test';
-  /** Base API URL for network services */
-  apiUrl: string;
-  /** Maximum retry attempts for async tasks */
-  maxRetries: number;
-  /** Timeout duration in milliseconds */
-  timeoutMs: number;
-  /** Enable detailed logging output */
-  debugMode: boolean;
+interface AppConfig {
+  port: number;
+  env: 'development' | 'production';
+  debug: boolean;
 }
 
-/**
- * Default configuration values used when environment overrides are not present.
- */
-export const defaultConfig: ToolkitConfig = {
+const DEFAULT_CONFIG: AppConfig = {
+  port: 3000,
   env: 'development',
-  apiUrl: 'http://localhost:3000/api',
-  maxRetries: 3,
-  timeoutMs: 5000,
-  debugMode: false,
+  debug: false,
 };
 
 /**
- * Parses environment variables and merges them with default configuration settings.
- *
- * @param overrides - Optional partial configuration to override defaults manually
- * @returns Fully populated ToolkitConfig object
+ * Merges user-defined configuration with system defaults.
  */
-export function loadConfig(overrides?: Partial<ToolkitConfig>): ToolkitConfig {
-  const envVar = (key: string): string | undefined => {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env[key];
+export function loadConfig(path?: string): AppConfig {
+  try {
+    if (!path || !fs.existsSync(path)) {
+      return { ...DEFAULT_CONFIG };
     }
-    return undefined;
-  };
 
-  const parsedConfig: ToolkitConfig = {
-    env: (envVar('NODE_ENV') as ToolkitConfig['env']) || defaultConfig.env,
-    apiUrl: envVar('API_URL') || defaultConfig.apiUrl,
-    maxRetries: envVar('MAX_RETRIES') ? parseInt(envVar('MAX_RETRIES')!, 10) : defaultConfig.maxRetries,
-    timeoutMs: envVar('TIMEOUT_MS') ? parseInt(envVar('TIMEOUT_MS')!, 10) : defaultConfig.timeoutMs,
-    debugMode: envVar('DEBUG') ? envVar('DEBUG') === 'true' : defaultConfig.debugMode,
-  };
+    const fileContent = fs.readFileSync(path, 'utf-8');
+    const userConfig: Partial<AppConfig> = JSON.parse(fileContent);
 
-  return { ...parsedConfig, ...overrides };
-}
-
-/**
- * Validates that a configuration object contains valid and acceptable bounds.
- *
- * @param config - The configuration object to validate
- * @returns Boolean indicating whether configuration is valid
- */
-export function validateConfig(config: ToolkitConfig): boolean {
-  if (config.maxRetries < 0 || config.maxRetries > 10) {
-    return false;
+    return {
+      ...DEFAULT_CONFIG,
+      ...userConfig,
+    };
+  } catch (error) {
+    console.error('Configuration load failed, using defaults:', error);
+    return { ...DEFAULT_CONFIG };
   }
-  if (config.timeoutMs <= 0) {
-    return false;
-  }
-  if (!config.apiUrl.startsWith('http://') && !config.apiUrl.startsWith('https://')) {
-    return false;
-  }
-  return true;
 }
