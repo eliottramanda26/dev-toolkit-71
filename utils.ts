@@ -1,41 +1,34 @@
-export const memoize = <T, R>(fn: (arg: T) => R): (arg: T) => R => {
-  const cache = new Map<T, R>();
-  return (arg: T): R => {
-    if (cache.has(arg)) {
-      return cache.get(arg)!;
-    }
-    const result = fn(arg);
-    cache.set(arg, result);
-    return result;
-  };
-};
+import * as winston from 'winston';
+import 'winston-daily-rotate-file';
 
-export const throttle = <T extends any[]>(fn: (...args: T) => void, limit: number) => {
-  let inThrottle = false;
-  return (...args: T) => {
-    if (!inThrottle) {
-      fn(...args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  };
-};
+/**
+ * dev-toolkit-71 logger setup with daily file rotation
+ * ensures log persistence while managing disk usage
+ */
+export const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.DailyRotateFile({
+      filename: 'logs/application-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '14d'
+    })
+  ]
+});
 
-export const debounce = <T extends any[]>(fn: (...args: T) => void, delay: number) => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: T) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
-};
+export interface LogMetadata {
+  correlationId?: string;
+  userId?: string;
+  [key: string]: any;
+}
 
-export const batchProcess = <T, R>(items: T[], fn: (batch: T[]) => Promise<R[]>, size: number = 100): Promise<R[]> => {
-  const results: R[] = [];
-  const execute = async (index: number): Promise<void> => {
-    if (index >= items.length) return;
-    const batch = items.slice(index, index + size);
-    results.push(...(await fn(batch)));
-    return execute(index + size);
-  };
-  return execute(0).then(() => results);
+export const logInfo = (message: string, meta?: LogMetadata) => {
+  logger.info(message, meta);
 };
