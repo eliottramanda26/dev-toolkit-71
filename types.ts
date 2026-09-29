@@ -1,40 +1,43 @@
 /**
- * Core domain interfaces for dev-toolkit-71
+ * Core interface for dev-toolkit-71 utility structures
  */
-
 export interface ToolkitConfig {
-  readonly version: string;
-  readonly environment: 'development' | 'production' | 'test';
-  readonly debug: boolean;
+  name: string;
+  version: string;
+  debugMode: boolean;
+  maxRetries: number;
 }
 
-export interface ProcessResult<T> {
-  readonly success: boolean;
-  readonly data?: T;
-  readonly error?: string;
-  readonly timestamp: number;
+/**
+ * Represents a generic execution result from toolkit services
+ */
+export interface ExecutionResult<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  timestamp: number;
 }
 
-export interface ResourceNode {
-  readonly id: string;
-  readonly path: string;
-  readonly metadata: Record<string, unknown>;
+/**
+ * Dictionary type for environment variable maps
+ */
+export type EnvMap = Record<string, string | undefined>;
+
+/**
+ * Configuration validator functional type
+ */
+export type ValidatorFn = (config: ToolkitConfig) => boolean;
+
+export const DEFAULT_CONFIG: ToolkitConfig = {
+  name: 'dev-toolkit-71',
+  version: '1.0.0',
+  debugMode: false,
+  maxRetries: 3
+};
+
+/**
+ * Type guard for checking if a result is successful
+ */
+export function isSuccessful<T>(result: ExecutionResult<T>): result is ExecutionResult<T> & { data: T } {
+  return result.success === true && result.data !== undefined;
 }
-
-export type Nullable<T> = T | null | undefined;
-
-export interface RegistryMap {
-  [key: string]: ResourceNode;
-}
-
-export const createResult = <T>(data: T): ProcessResult<T> => ({
-  success: true,
-  data,
-  timestamp: Date.now(),
-});
-
-export const createError = (message: string): ProcessResult<never> => ({
-  success: false,
-  error: message,
-  timestamp: Date.now(),
-});
