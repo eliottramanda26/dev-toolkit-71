@@ -1,35 +1,38 @@
-import fs from 'fs';
-
-interface AppConfig {
-  port: number;
-  env: 'development' | 'production';
-  debug: boolean;
+export interface AppConfig {
+  endpoint: string;
+  timeout: number;
 }
 
-const DEFAULT_CONFIG: AppConfig = {
-  port: 3000,
-  env: 'development',
-  debug: false,
-};
+/**
+ * Validates application configuration objects.
+ * Ensures endpoint is a valid URL and timeout is positive.
+ */
+export function validateConfig(config: unknown): AppConfig {
+  if (!config || typeof config !== 'object') {
+    throw new Error('invalid configuration: object expected');
+  }
+
+  const { endpoint, timeout } = config as Partial<AppConfig>;
+
+  if (typeof endpoint !== 'string' || !endpoint.startsWith('http')) {
+    throw new Error('invalid configuration: endpoint must be a valid url string');
+  }
+
+  if (typeof timeout !== 'number' || timeout <= 0) {
+    throw new Error('invalid configuration: timeout must be a positive integer');
+  }
+
+  return { endpoint, timeout };
+}
 
 /**
- * Merges user-defined configuration with system defaults.
+ * Safely parses environment configuration from process object.
  */
-export function loadConfig(path?: string): AppConfig {
+export function loadConfig(raw: Record<string, any>): AppConfig {
   try {
-    if (!path || !fs.existsSync(path)) {
-      return { ...DEFAULT_CONFIG };
-    }
-
-    const fileContent = fs.readFileSync(path, 'utf-8');
-    const userConfig: Partial<AppConfig> = JSON.parse(fileContent);
-
-    return {
-      ...DEFAULT_CONFIG,
-      ...userConfig,
-    };
-  } catch (error) {
-    console.error('Configuration load failed, using defaults:', error);
-    return { ...DEFAULT_CONFIG };
+    return validateConfig(raw);
+  } catch (err) {
+    console.error('config initialization failure:', err instanceof Error ? err.message : String(err));
+    throw new Error('application startup aborted due to configuration errors');
   }
 }
