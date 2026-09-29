@@ -1,34 +1,28 @@
-import * as winston from 'winston';
-import 'winston-daily-rotate-file';
-
-/**
- * dev-toolkit-71 logger setup with daily file rotation
- * ensures log persistence while managing disk usage
- */
-export const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.DailyRotateFile({
-      filename: 'logs/application-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      zippedArchive: true,
-      maxSize: '20m',
-      maxFiles: '14d'
-    })
-  ]
-});
-
-export interface LogMetadata {
-  correlationId?: string;
-  userId?: string;
-  [key: string]: any;
+export interface RetryOptions {
+  maxAttempts: number;
+  delayMs: number;
 }
 
-export const logInfo = (message: string, meta?: LogMetadata) => {
-  logger.info(message, meta);
-};
+/**
+ * Executes a function with exponential backoff retry logic.
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < options.maxAttempts) {
+        const backoff = options.delayMs * Math.pow(2, attempt - 1);
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+      }
+    }
+  }
+
+  throw lastError;
+}
