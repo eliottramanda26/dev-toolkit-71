@@ -1,38 +1,53 @@
 export interface AppConfig {
-  endpoint: string;
-  timeout: number;
+  env: 'development' | 'production' | 'test';
+  port: number;
+  logLevel: 'debug' | 'info' | 'warn' | 'error';
+  database: {
+    host: string;
+    port: number;
+    name: string;
+  };
+  features: {
+    enableMetrics: boolean;
+    enableCors: boolean;
+  };
 }
 
-/**
- * Validates application configuration objects.
- * Ensures endpoint is a valid URL and timeout is positive.
- */
-export function validateConfig(config: unknown): AppConfig {
-  if (!config || typeof config !== 'object') {
-    throw new Error('invalid configuration: object expected');
-  }
-
-  const { endpoint, timeout } = config as Partial<AppConfig>;
-
-  if (typeof endpoint !== 'string' || !endpoint.startsWith('http')) {
-    throw new Error('invalid configuration: endpoint must be a valid url string');
-  }
-
-  if (typeof timeout !== 'number' || timeout <= 0) {
-    throw new Error('invalid configuration: timeout must be a positive integer');
-  }
-
-  return { endpoint, timeout };
-}
+export const defaultConfig: AppConfig = {
+  env: 'development',
+  port: 3000,
+  logLevel: 'info',
+  database: {
+    host: 'localhost',
+    port: 5432,
+    name: 'dev_db',
+  },
+  features: {
+    enableMetrics: false,
+    enableCors: true,
+  },
+};
 
 /**
- * Safely parses environment configuration from process object.
+ * Merges user configuration overrides with default settings
+ * and environment variable fallbacks.
  */
-export function loadConfig(raw: Record<string, any>): AppConfig {
-  try {
-    return validateConfig(raw);
-  } catch (err) {
-    console.error('config initialization failure:', err instanceof Error ? err.message : String(err));
-    throw new Error('application startup aborted due to configuration errors');
-  }
+export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
+  const envName = (typeof process !== 'undefined' && process.env?.NODE_ENV) as AppConfig['env'];
+  const envPort = typeof process !== 'undefined' && process.env?.PORT ? parseInt(process.env.PORT, 10) : undefined;
+
+  return {
+    ...defaultConfig,
+    ...overrides,
+    env: overrides.env ?? envName ?? defaultConfig.env,
+    port: overrides.port ?? (envPort && !isNaN(envPort) ? envPort : defaultConfig.port),
+    database: {
+      ...defaultConfig.database,
+      ...overrides.database,
+    },
+    features: {
+      ...defaultConfig.features,
+      ...overrides.features,
+    },
+  };
 }
