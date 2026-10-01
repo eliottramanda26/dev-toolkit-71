@@ -1,58 +1,42 @@
 /**
- * Utility functions for common developer tasks in dev-toolkit-71.
+ * Utility functions for dev-toolkit-71 data processing
  */
 
+export type DataRecord = Record<string, unknown>;
+
 /**
- * Splits an array into smaller chunks of a specified size.
+ * Deep cleans an object by removing null and undefined values
  */
-export function chunkArray<T>(items: T[], size: number): T[][] {
-  if (size <= 0) return [items];
-  const result: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    result.push(items.slice(i, i + size));
-  }
-  return result;
+export function cleanObject<T extends DataRecord>(obj: T): Partial<T> {
+  return Object.entries(obj).reduce((acc, [key, value]) => {
+    if (value !== null && value !== undefined) {
+      acc[key as keyof T] = value as T[keyof T];
+    }
+    return acc;
+  }, {} as Partial<T>);
 }
 
 /**
- * Converts a string into a URL-friendly slug.
+ * Safely extracts a nested property from an object using a string path
  */
-export function slugify(text: string): string {
-  return text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w\-]+/g, '')
-    .replace(/\-\-+/g, '-');
+export function getDeepValue(obj: unknown, path: string): unknown {
+  if (!obj || typeof obj !== 'object') return undefined;
+
+  return path.split('.').reduce((acc: any, part) => {
+    return acc && acc[part] !== undefined ? acc[part] : undefined;
+  }, obj);
 }
 
 /**
- * Formats a byte value into a human-readable string (e.g., "1.5 MB").
+ * Groups an array of objects by a specific key
  */
-export function formatBytes(bytes: number, decimals: number = 2): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-}
-
-/**
- * Delays execution for a specified duration in milliseconds.
- */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Safely parses a JSON string with a default fallback value.
- */
-export function safeJsonParse<T>(jsonString: string, fallback: T): T {
-  try {
-    return JSON.parse(jsonString) as T;
-  } catch {
-    return fallback;
-  }
+export function groupBy<T extends DataRecord>(items: T[], key: keyof T): Record<string, T[]> {
+  return items.reduce((acc, item) => {
+    const group = String(item[key]);
+    if (!acc[group]) {
+      acc[group] = [];
+    }
+    acc[group].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
 }
