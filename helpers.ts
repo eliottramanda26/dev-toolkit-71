@@ -1,28 +1,48 @@
 /**
- * dev-toolkit-71 common utility functions
+ * Configuration constants for dev-toolkit-71 operations
  */
+export const DEFAULT_TIMEOUT_MS = 5000;
 
-export const sleep = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
+export interface TaskResult<T> {
+  success: boolean;
+  data: T | null;
+  error?: string;
+}
 
-export const chunkArray = <T>(array: T[], size: number): T[][] => {
-  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
-    array.slice(i * size, i * size + size)
-  );
-};
+/**
+ * Formats a given string into a consistent development identifier
+ * @param input The raw string to normalize
+ * @returns The normalized identifier in kebab-case
+ */
+export function formatIdentifier(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
+}
 
-export const debounce = <F extends (...args: any[]) => any>(fn: F, delay: number) => {
-  let timer: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<F>) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
-};
+/**
+ * Safely parses a JSON string with type enforcement
+ * @param json The JSON string to parse
+ * @returns A TaskResult containing the parsed object or error details
+ */
+export function safeParse<T>(json: string): TaskResult<T> {
+  try {
+    const data: T = JSON.parse(json);
+    return { success: true, data };
+  } catch (err) {
+    return {
+      success: false,
+      data: null,
+      error: err instanceof Error ? err.message : 'Unknown parsing error'
+    };
+  }
+}
 
-export const getOrElse = <T>(value: T | null | undefined, defaultValue: T): T => {
-  return value ?? defaultValue;
-};
-
-export const isObject = (item: unknown): item is Record<string, unknown> => {
-  return !!item && typeof item === 'object' && !Array.isArray(item);
+/**
+ * Delays execution by the specified milliseconds
+ * @param ms Duration in milliseconds
+ */
+export const delay = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 };
