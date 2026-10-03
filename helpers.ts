@@ -1,48 +1,69 @@
-/**
- * Configuration constants for dev-toolkit-71 operations
- */
-export const DEFAULT_TIMEOUT_MS = 5000;
+export interface ProcessItem {
+  id: string;
+  payload: Record<string, unknown>;
+  priority?: number;
+  timestamp?: number;
+}
 
-export interface TaskResult<T> {
+export interface ProcessResult<T = unknown> {
+  id: string;
   success: boolean;
-  data: T | null;
+  data?: T;
   error?: string;
 }
 
 /**
- * Formats a given string into a consistent development identifier
- * @param input The raw string to normalize
- * @returns The normalized identifier in kebab-case
+ * Validates an incoming item structure before execution.
  */
-export function formatIdentifier(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-');
-}
-
-/**
- * Safely parses a JSON string with type enforcement
- * @param json The JSON string to parse
- * @returns A TaskResult containing the parsed object or error details
- */
-export function safeParse<T>(json: string): TaskResult<T> {
-  try {
-    const data: T = JSON.parse(json);
-    return { success: true, data };
-  } catch (err) {
-    return {
-      success: false,
-      data: null,
-      error: err instanceof Error ? err.message : 'Unknown parsing error'
-    };
+export function validateItem(item: unknown): { valid: boolean; error?: string } {
+  if (!item || typeof item !== 'object') {
+    return { valid: false, error: 'Item must be a non-null object' };
   }
+  const record = item as Partial<ProcessItem>;
+  if (typeof record.id !== 'string' || record.id.trim() === '') {
+    return { valid: false, error: 'Missing or invalid item ID' };
+  }
+  if (!record.payload || typeof record.payload !== 'object' || Array.isArray(record.payload)) {
+    return { valid: false, error: 'Payload must be a valid object' };
+  }
+  if (record.priority !== undefined && (typeof record.priority !== 'number' || record.priority < 0)) {
+    return { valid: false, error: 'Priority must be a non-negative number' };
+  }
+  return { valid: true };
 }
 
 /**
- * Delays execution by the specified milliseconds
- * @param ms Duration in milliseconds
+ * Processes a batch of raw input items with strict validation checks.
  */
-export const delay = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
+export function processBatchItems(
+  items: unknown[],
+  handler: (item: ProcessItem) => unknown
+): ProcessResult[] {
+  const results: ProcessResult[] = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const rawItem = items[i];
+    const validation = validateItem(rawItem);
+
+    if (!validation.valid) {
+      const itemId = (rawItem as Partial<ProcessItem>)?.id ?? `index-${i}`;
+      results.push({
+        id: itemId,
+        success: false,
+        error: validation.error ?? 'Validation failed'
+      });
+      continue;
+    }
+
+    const validItem = rawItem as ProcessItem;
+    try {
+      const output = handler(validItem);
+      results.push({ id: validItem.id, success: true, data: output });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Processing error';
+      results.push({ id: validItem.id, success: false, error: message });
+    }
+  }
+
+  return results;
+}
