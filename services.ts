@@ -1,44 +1,68 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-interface LoggerConfig {
-  logDir: string;
-  maxSize: number;
+export interface TaskInput {
+  id: string;
+  name: string;
+  priority: 'low' | 'medium' | 'high';
+  payload: Record<string, unknown>;
 }
 
-/**
- * Manages application logging with file rotation
- */
-export class LoggerService {
-  private readonly logPath: string;
-  private readonly maxSize: number;
+export interface ProcessResult {
+  successful: string[];
+  failed: { id: string; error: string }[];
+}
 
-  constructor(config: LoggerConfig) {
-    this.logPath = path.join(config.logDir, 'app.log');
-    this.maxSize = config.maxSize;
-
-    if (!fs.existsSync(config.logDir)) {
-      fs.mkdirSync(config.logDir, { recursive: true });
-    }
+export function validateInput(input: any): string[] {
+  const errors: string[] = [];
+  if (!input || typeof input !== 'object') {
+    return ['Input must be a valid object'];
   }
-
-  private rotate(): void {
-    const backupPath = `${this.logPath}.old`;
-    if (fs.existsSync(this.logPath)) {
-      fs.renameSync(this.logPath, backupPath);
-    }
+  if (typeof input.id !== 'string' || input.id.trim() === '') {
+    errors.push('id must be a non-empty string');
   }
+  if (typeof input.name !== 'string' || input.name.trim() === '') {
+    errors.push('name must be a non-empty string');
+  }
+  const validPriorities = ['low', 'medium', 'high'];
+  if (!validPriorities.includes(input.priority)) {
+    errors.push(`priority must be one of: ${validPriorities.join(', ')}`);
+  }
+  if (!input.payload || typeof input.payload !== 'object') {
+    errors.push('payload must be an object');
+  }
+  return errors;
+}
 
-  public log(message: string): void {
+export function processBatch(inputs: unknown[]): ProcessResult {
+  const successful: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+
+  for (let i = 0; i < inputs.length; i++) {
+    const rawInput = inputs[i];
+    const errors = validateInput(rawInput);
+    const identifier = (rawInput && typeof rawInput === 'object' && 'id' in rawInput) 
+      ? String((rawInput as any).id) 
+      : `index_${i}`;
+
+    if (errors.length > 0) {
+      failed.push({
+        id: identifier,
+        error: `Validation failed: ${errors.join('; ')}` 
+      });
+      continue;
+    }
+
     try {
-      if (fs.existsSync(this.logPath) && fs.statSync(this.logPath).size > this.maxSize) {
-        this.rotate();
+      const task = rawInput as TaskInput;
+      if (task.priority === 'high' && Object.keys(task.payload).length === 0) {
+        throw new Error('High priority task payload cannot be empty');
       }
-
-      const entry = `[${new Date().toISOString()}] ${message}\n`;
-      fs.appendFileSync(this.logPath, entry);
+      successful.push(task.id);
     } catch (err) {
-      console.error('Logging failure:', err);
+      failed.push({
+        id: identifier,
+        error: err instanceof Error ? err.message : 'Unknown processing error'
+      });
     }
   }
+
+  return { successful, failed };
 }
