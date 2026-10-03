@@ -1,41 +1,30 @@
-/**
- * Memoization utility for expensive module operations
- */
-export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
-  const cache = new Map<T, R>();
-  return (arg: T): R => {
-    if (cache.has(arg)) {
-      return cache.get(arg)!;
-    }
-    const result = fn(arg);
-    cache.set(arg, result);
-    return result;
-  };
+export interface RetryOptions {
+  retries?: number;
+  delay?: number;
+  factor?: number;
+  backoff?: boolean;
 }
 
 /**
- * Throttled execution for high-frequency updates
+ * Executes an asynchronous operation with retry logic and exponential backoff.
  */
-export function throttle(func: (...args: any[]) => void, limit: number) {
-  let inThrottle: boolean;
-  return function(this: any, ...args: any[]) {
-    if (!inThrottle) {
-      func.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  };
-}
+export async function retry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const { retries = 3, delay = 1000, factor = 2, backoff = true } = options;
+  let attempt = 0;
 
-/**
- * Efficient batch processing for core tasks
- */
-export async function batchProcess<T, R>(items: T[], fn: (item: T) => Promise<R>, chunkSize: number = 10): Promise<R[]> {
-  const results: R[] = [];
-  for (let i = 0; i < items.length; i += chunkSize) {
-    const chunk = items.slice(i, i + chunkSize);
-    const chunkResults = await Promise.all(chunk.map(fn));
-    results.push(...chunkResults);
+  while (true) {
+    try {
+      return await fn();
+    } catch (error) {
+      attempt++;
+      if (attempt >= retries) {
+        throw error;
+      }
+      const sleepTime = backoff ? delay * Math.pow(factor, attempt - 1) : delay;
+      await new Promise((resolve) => setTimeout(resolve, sleepTime));
+    }
   }
-  return results;
 }
