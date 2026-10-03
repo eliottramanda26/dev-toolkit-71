@@ -1,69 +1,79 @@
-export interface ProcessItem {
-  id: string;
-  payload: Record<string, unknown>;
-  priority?: number;
-  timestamp?: number;
-}
-
-export interface ProcessResult<T = unknown> {
-  id: string;
-  success: boolean;
-  data?: T;
-  error?: string;
+/**
+ * Utility options for object operations.
+ */
+export interface FormatOptions {
+  /** Whether to strip special characters from the result. */
+  stripSpecial?: boolean;
+  /** Custom fallback value if input is empty or invalid. */
+  fallback?: string;
 }
 
 /**
- * Validates an incoming item structure before execution.
+ * Safely parses a JSON string into a strongly-typed object without throwing.
+ *
+ * @template T The expected return type.
+ * @param jsonString - The raw JSON string to parse.
+ * @param fallback - The fallback value if parsing fails.
+ * @returns The parsed object or fallback value.
  */
-export function validateItem(item: unknown): { valid: boolean; error?: string } {
-  if (!item || typeof item !== 'object') {
-    return { valid: false, error: 'Item must be a non-null object' };
+export function safeJsonParse<T>(jsonString: string, fallback: T): T {
+  try {
+    return JSON.parse(jsonString) as T;
+  } catch {
+    return fallback;
   }
-  const record = item as Partial<ProcessItem>;
-  if (typeof record.id !== 'string' || record.id.trim() === '') {
-    return { valid: false, error: 'Missing or invalid item ID' };
-  }
-  if (!record.payload || typeof record.payload !== 'object' || Array.isArray(record.payload)) {
-    return { valid: false, error: 'Payload must be a valid object' };
-  }
-  if (record.priority !== undefined && (typeof record.priority !== 'number' || record.priority < 0)) {
-    return { valid: false, error: 'Priority must be a non-negative number' };
-  }
-  return { valid: true };
 }
 
 /**
- * Processes a batch of raw input items with strict validation checks.
+ * Truncates a string to a specified length and appends a custom suffix.
+ *
+ * @param str - The input string to truncate.
+ * @param maxLength - Maximum allowed length including suffix.
+ * @param suffix - Suffix to append when truncated (defaults to '...').
+ * @returns The truncated or original string.
  */
-export function processBatchItems(
-  items: unknown[],
-  handler: (item: ProcessItem) => unknown
-): ProcessResult[] {
-  const results: ProcessResult[] = [];
-
-  for (let i = 0; i < items.length; i++) {
-    const rawItem = items[i];
-    const validation = validateItem(rawItem);
-
-    if (!validation.valid) {
-      const itemId = (rawItem as Partial<ProcessItem>)?.id ?? `index-${i}`;
-      results.push({
-        id: itemId,
-        success: false,
-        error: validation.error ?? 'Validation failed'
-      });
-      continue;
-    }
-
-    const validItem = rawItem as ProcessItem;
-    try {
-      const output = handler(validItem);
-      results.push({ id: validItem.id, success: true, data: output });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Processing error';
-      results.push({ id: validItem.id, success: false, error: message });
-    }
+export function truncate(
+  str: string,
+  maxLength: number,
+  suffix: string = '...'
+): string {
+  if (str.length <= maxLength) {
+    return str;
   }
+  const effectiveLength = Math.max(0, maxLength - suffix.length);
+  return str.slice(0, effectiveLength) + suffix;
+}
 
-  return results;
+/**
+ * Delays execution for a given number of milliseconds.
+ *
+ * @param ms - Duration to sleep in milliseconds.
+ * @returns A promise that resolves after the specified duration.
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Creates a debounced version of a function that delays execution.
+ *
+ * @template T Function signature extending generic function type.
+ * @param fn - The target function to debounce.
+ * @param delayMs - Delay duration in milliseconds.
+ * @returns A debounced wrapper function.
+ */
+export function debounce<T extends (...args: any[]) => void>(
+  fn: T,
+  delayMs: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<T>): void => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      fn(...args);
+    }, delayMs);
+  };
 }
