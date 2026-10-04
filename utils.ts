@@ -1,30 +1,40 @@
-export interface RetryOptions {
-  retries?: number;
-  delay?: number;
-  factor?: number;
-  backoff?: boolean;
+interface ProcessingInput {
+  id: string;
+  payload: unknown;
+  timestamp: number;
 }
 
 /**
- * Executes an asynchronous operation with retry logic and exponential backoff.
+ * validates structure and types of incoming data
  */
-export async function retry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const { retries = 3, delay = 1000, factor = 2, backoff = true } = options;
-  let attempt = 0;
+export function validateInput(input: unknown): input is ProcessingInput {
+  if (typeof input !== 'object' || input === null) return false;
 
-  while (true) {
+  const { id, payload, timestamp } = input as any;
+
+  return (
+    typeof id === 'string' &&
+    payload !== undefined &&
+    typeof timestamp === 'number' &&
+    !isNaN(timestamp)
+  );
+}
+
+/**
+ * core processing loop with validation guard
+ */
+export function processBatch(data: unknown[]): void {
+  for (const item of data) {
+    if (!validateInput(item)) {
+      console.error('invalid record format detected, skipping:', item);
+      continue;
+    }
+
     try {
-      return await fn();
-    } catch (error) {
-      attempt++;
-      if (attempt >= retries) {
-        throw error;
-      }
-      const sleepTime = backoff ? delay * Math.pow(factor, attempt - 1) : delay;
-      await new Promise((resolve) => setTimeout(resolve, sleepTime));
+      const { id, payload } = item;
+      console.log(`processing task ${id} with data:`, payload);
+    } catch (err) {
+      console.error(`execution error in task ${item.id}:`, err);
     }
   }
 }
