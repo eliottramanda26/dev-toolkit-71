@@ -1,40 +1,29 @@
-/**
- * dev-toolkit-71 helper utilities
- */
-
-export type DataItem = Record<string, unknown>;
+import * as winston from 'winston';
+import 'winston-daily-rotate-file';
 
 /**
- * deep clone of simple json objects
+ * Configuration for logger with daily rotation policy
  */
-export const clone = <T>(source: T): T => JSON.parse(JSON.stringify(source));
+const transport = new winston.transports.DailyRotateFile({
+  filename: 'logs/application-%DATE%.log',
+  datePattern: 'YYYY-MM-DD',
+  zippedArchive: true,
+  maxSize: '20m',
+  maxFiles: '14d',
+  level: 'info'
+});
 
-/**
- * chunk array into smaller segments
- */
-export const chunk = <T>(array: T[], size: number): T[][] => {
-  const result: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    result.push(array.slice(i, i + size));
-  }
-  return result;
-};
+export const logger = winston.createLogger({
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    transport,
+    new winston.transports.Console({
+      format: winston.format.simple()
+    })
+  ]
+});
 
-/**
- * wait for a duration in milliseconds
- */
-export const sleep = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * extract keys from object safely
- */
-export const getKeys = <T extends object>(obj: T): (keyof T)[] => 
-  Object.keys(obj) as (keyof T)[];
-
-/**
- * check if value is a plain object
- */
-export const isObject = (item: unknown): item is Record<string, unknown> => {
-  return typeof item === 'object' && item !== null && !Array.isArray(item);
-};
+// Usage example: logger.info('System initialization complete')
