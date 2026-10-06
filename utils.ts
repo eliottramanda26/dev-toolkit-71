@@ -1,32 +1,40 @@
-export interface RetryOptions {
-  maxAttempts: number;
-  delayMs: number;
+/**
+ * dev-toolkit-71 utility collection
+ */
+
+export interface ToolConfig {
+  id: string;
+  enabled: boolean;
+  timeout: number;
 }
 
-/**
- * Executes an asynchronous function with exponential backoff
- */
-export async function withRetry<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
-): Promise<T> {
-  let lastError: unknown;
+export const validateConfig = (config: unknown): config is ToolConfig => {
+  return (
+    typeof config === 'object' &&
+    config !== null &&
+    'id' in config &&
+    typeof (config as ToolConfig).id === 'string'
+  );
+};
 
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
+export const formatTimestamp = (date: Date = new Date()): string => {
+  return date.toISOString().replace(/T/, ' ').replace(/\..+/, '');
+};
+
+export const retryOperation = async <T>(
+  fn: () => Promise<T>,
+  attempts: number = 3
+): Promise<T> => {
+  for (let i = 0; i < attempts; i++) {
     try {
-      return await operation();
+      return await fn();
     } catch (err) {
-      lastError = err;
-
-      if (attempt < options.maxAttempts) {
-        const backoff = options.delayMs * Math.pow(2, attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, backoff));
-      }
+      if (i === attempts - 1) throw err;
     }
   }
+  throw new Error('operation failed after multiple attempts');
+};
 
-  throw lastError;
-}
-
-export const delay = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+export const createSafeContext = <T extends Record<string, any>>(base: T) => {
+  return Object.freeze({ ...base });
+};
