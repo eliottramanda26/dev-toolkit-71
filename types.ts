@@ -1,43 +1,43 @@
 /**
- * Core interface for dev-toolkit-71 utility structures
+ * Core interface for toolkit processing units
+ */
+export interface TaskDefinition {
+  id: string;
+  name: string;
+  priority: number;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Union type for operation outcomes
+ */
+export type OperationResult<T> = 
+  | { success: true; data: T }
+  | { success: false; error: string };
+
+/**
+ * Configuration schema for the dev-toolkit-71 engine
  */
 export interface ToolkitConfig {
-  name: string;
-  version: string;
-  debugMode: boolean;
-  maxRetries: number;
+  env: 'development' | 'production';
+  maxConcurrency: number;
+  retryAttempts: number;
+  enableCache: boolean;
 }
 
 /**
- * Represents a generic execution result from toolkit services
+ * Mapper for transformation utilities
  */
-export interface ExecutionResult<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  timestamp: number;
-}
+export type Transformer<I, O> = (input: I) => O;
 
 /**
- * Dictionary type for environment variable maps
+ * Generic constraint for toolkit service definitions
  */
-export type EnvMap = Record<string, string | undefined>;
-
-/**
- * Configuration validator functional type
- */
-export type ValidatorFn = (config: ToolkitConfig) => boolean;
+export type ServiceFactory<T> = (config: ToolkitConfig) => T;
 
 export const DEFAULT_CONFIG: ToolkitConfig = {
-  name: 'dev-toolkit-71',
-  version: '1.0.0',
-  debugMode: false,
-  maxRetries: 3
+  env: 'development',
+  maxConcurrency: 4,
+  retryAttempts: 3,
+  enableCache: true
 };
-
-/**
- * Type guard for checking if a result is successful
- */
-export function isSuccessful<T>(result: ExecutionResult<T>): result is ExecutionResult<T> & { data: T } {
-  return result.success === true && result.data !== undefined;
-}
