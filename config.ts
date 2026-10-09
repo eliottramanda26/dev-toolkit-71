@@ -1,41 +1,37 @@
-/**
- * Configuration schema and environment defaults for dev-toolkit-71
- */
+import fs from 'fs';
 
-export interface ToolkitConfig {
-  readonly environment: 'development' | 'production' | 'staging';
-  readonly port: number;
-  readonly timeoutMs: number;
-  readonly debug: boolean;
+interface AppConfig {
+  port: number;
+  env: 'development' | 'production';
+  debug: boolean;
 }
 
-export const defaultConfig: ToolkitConfig = {
-  environment: 'development',
+const defaults: AppConfig = {
   port: 3000,
-  timeoutMs: 5000,
-  debug: true,
+  env: 'development',
+  debug: false
 };
 
 /**
- * Validates that the provided configuration object meets the schema requirements
- * @param config - The raw configuration object to validate
- * @returns boolean indicating if the configuration is valid
+ * Merges file-based configuration with provided defaults
  */
-export function validateConfig(config: Partial<ToolkitConfig>): boolean {
-  if (config.port !== undefined && (config.port < 1024 || config.port > 65535)) {
-    return false;
+export function loadConfig(configPath: string): AppConfig {
+  try {
+    if (!fs.existsSync(configPath)) {
+      return { ...defaults };
+    }
+
+    const fileContent = fs.readFileSync(configPath, 'utf-8');
+    const parsed: Partial<AppConfig> = JSON.parse(fileContent);
+
+    return {
+      ...defaults,
+      ...parsed
+    };
+  } catch (error) {
+    console.error('Failed to load config, falling back to defaults');
+    return { ...defaults };
   }
-  return true;
 }
 
-/**
- * Merges user provided overrides with the established default configuration
- * @param overrides - Partial configuration values to apply
- * @returns A fully merged ToolkitConfig object
- */
-export function createConfig(overrides: Partial<ToolkitConfig>): ToolkitConfig {
-  return {
-    ...defaultConfig,
-    ...overrides,
-  };
-}
+export const config = loadConfig('./config.json');
