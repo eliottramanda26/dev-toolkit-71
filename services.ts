@@ -1,65 +1,62 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-export interface LoggerOptions {
-  logDir: string;
-  maxFileSize?: number; // size in bytes, defaults to 1MB
-  maxFiles?: number;    // maximum backup files to keep
+export interface RetryOptions {
+  maxRetries: number;
+  delayMs: number;
+  backoffFactor: number;
+  onRetry?: (attempt: number, error: Error) => void;
 }
 
-export class RotatingLogger {
-  private logDir: string;
-  private maxFileSize: number;
-  private maxFiles: number;
-  private currentFilePath: string;
+const DEFAULT_OPTIONS: RetryOptions = {
+  maxRetries: 3,
+  delayMs: 1000,
+  backoffFactor: 2,
+};
 
-  constructor(options: LoggerOptions) {
-    this.logDir = options.logDir;
-    this.maxFileSize = options.maxFileSize || 1024 * 1024;
-    this.maxFiles = options.maxFiles || 5;
-    this.currentFilePath = path.join(this.logDir, 'app.log');
+/**
+ * Executes an async network operation with exponential backoff retry logic.
+ */
+export async function retryOperation<T>(
+  operation: () => Promise<T>,
+  options: Partial<RetryOptions> = {}
+): Promise<T> {
+  const config: RetryOptions = { ...DEFAULT_OPTIONS, ...options };
+  let currentDelay = config.delayMs;
 
-    if (!fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
-    }
-  }
+  for (let attempt = 1; attempt <= config.maxRetries + 1; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
 
-  /**
-   * Rotates old log files sequentially when the current file size limit is reached
-   */
-  private rotate(): void {
-    for (let i = this.maxFiles - 1; i >= 1; i--) {
-      const oldPath = path.join(this.logDir, `app.${i}.log`);
-      const newPath = path.join(this.logDir, `app.${i + 1}.log`);
-
-      if (fs.existsSync(oldPath)) {
-        if (i + 1 > this.maxFiles) {
-          fs.unlinkSync(oldPath);
-        } else {
-          fs.renameSync(oldPath, newPath);
-        }
+      if (attempt > config.maxRetries) {
+        throw new Error(`Operation failed after ${config.maxRetries} retries: ${err.message}`);
       }
-    }
 
-    if (fs.existsSync(this.currentFilePath)) {
-      fs.renameSync(this.currentFilePath, path.join(this.logDir, 'app.1.log'));
-    }
-  }
-
-  /**
-   * Appends a structured log message, trigger rotation checks prior to write
-   */
-  public log(message: string): void {
-    const timestamp = new Date().toISOString();
-    const logLine = `[${timestamp}] ${message}\n`;
-
-    if (fs.existsSync(this.currentFilePath)) {
-      const stats = fs.statSync(this.currentFilePath);
-      if (stats.size + Buffer.byteLength(logLine) > this.maxFileSize) {
-        this.rotate();
+      if (config.onRetry) {
+        config.onRetry(attempt, err);
       }
-    }
 
-    fs.appendFileSync(this.currentFilePath, logLine, 'utf8');
+      await new Promise((resolve) => setTimeout(resolve, currentDelay));
+      currentDelay *= config.backoffFactor;
+    }
   }
+
+  throw new Error('Unexpected end of retry loop');
+}
+
+/**
+ * Wrapper around fetch that retries on server errors (5xx) or network failures.
+ */
+export async function fetchWithRetry(
+  url: string,
+  init?: RequestInit,
+  retryOptions?: Partial<RetryOptions>
+): Promise<Response> {
+  return retryOperation(async () => {
+    const response = await fetch(url, init);
+    // Re-throw for 5xx errors to trigger retry
+    if (!response.ok && response.status >= 500) {
+      throw new Error(`Server returned HTTP status ${response.status}`);
+    }
+    return response;
+  }, retryOptions);
 }
