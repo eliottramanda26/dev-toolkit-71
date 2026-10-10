@@ -7,20 +7,20 @@ export interface RetryOptions {
  * Executes a function with exponential backoff retry logic.
  */
 export async function withRetry<T>(
-  operation: () => Promise<T>,
+  fn: () => Promise<T>,
   options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
 ): Promise<T> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
     try {
-      return await operation();
+      return await fn();
     } catch (err) {
       lastError = err;
-
       if (attempt < options.maxAttempts) {
-        const waitTime = options.delayMs * Math.pow(2, attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        await new Promise((resolve) => 
+          setTimeout(resolve, options.delayMs * Math.pow(2, attempt - 1))
+        );
       }
     }
   }
