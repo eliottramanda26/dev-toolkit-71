@@ -1,42 +1,27 @@
 export interface RetryOptions {
-  retries?: number;
-  delayMs?: number;
-  backoffFactor?: number;
-  maxDelayMs?: number;
-  shouldRetry?: (error: unknown) => boolean;
+  maxAttempts: number;
+  delayMs: number;
 }
 
 /**
- * Executes an async operation with exponential backoff retry logic.
- * Useful for transient network failures and resilient API calls.
+ * Executes a function with exponential backoff retry logic.
  */
-export async function retryNetworkOp<T>(
+export async function withRetry<T>(
   operation: () => Promise<T>,
-  options: RetryOptions = {}
+  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
 ): Promise<T> {
-  const {
-    retries = 3,
-    delayMs = 1000,
-    backoffFactor = 2,
-    maxDelayMs = 10000,
-    shouldRetry = () => true,
-  } = options;
-
-  let currentDelay = delayMs;
   let lastError: unknown;
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
     try {
       return await operation();
-    } catch (error) {
-      lastError = error;
+    } catch (err) {
+      lastError = err;
 
-      if (attempt === retries || !shouldRetry(error)) {
-        break;
+      if (attempt < options.maxAttempts) {
+        const waitTime = options.delayMs * Math.pow(2, attempt - 1);
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
-
-      await new Promise((resolve) => setTimeout(resolve, currentDelay));
-      currentDelay = Math.min(currentDelay * backoffFactor, maxDelayMs);
     }
   }
 
