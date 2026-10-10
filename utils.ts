@@ -1,36 +1,44 @@
+export interface RetryOptions {
+  retries?: number;
+  delayMs?: number;
+  backoffFactor?: number;
+  maxDelayMs?: number;
+  shouldRetry?: (error: unknown) => boolean;
+}
+
 /**
- * Memoization decorator for expensive computational tasks
+ * Executes an async operation with exponential backoff retry logic.
+ * Useful for transient network failures and resilient API calls.
  */
-export function memoize<T extends (...args: any[]) => any>(fn: T): T {
-  const cache = new Map<string, ReturnType<T>>();
-  return ((...args: Parameters<T>): ReturnType<T> => {
-    const key = JSON.stringify(args);
-    if (cache.has(key)) {
-      return cache.get(key)!;
+export async function retryNetworkOp<T>(
+  operation: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const {
+    retries = 3,
+    delayMs = 1000,
+    backoffFactor = 2,
+    maxDelayMs = 10000,
+    shouldRetry = () => true,
+  } = options;
+
+  let currentDelay = delayMs;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === retries || !shouldRetry(error)) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, currentDelay));
+      currentDelay = Math.min(currentDelay * backoffFactor, maxDelayMs);
     }
-    const result = fn(...args);
-    cache.set(key, result);
-    return result;
-  }) as T;
-}
-
-/**
- * Debounce wrapper for high-frequency event listeners
- */
-export function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
-}
-
-/**
- * Batch processing utility to reduce event loop overhead
- */
-export async function batchProcess<T>(items: T[], size: number, processor: (item: T) => Promise<void>): Promise<void> {
-  for (let i = 0; i < items.length; i += size) {
-    const batch = items.slice(i, i + size);
-    await Promise.all(batch.map(processor));
   }
+
+  throw lastError;
 }
