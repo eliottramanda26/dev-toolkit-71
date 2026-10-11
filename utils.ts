@@ -1,50 +1,36 @@
-/**
- * Data handling utilities for dev-toolkit-71
- */
-
-export type Nullable<T> = T | null | undefined;
-
-/**
- * Safely extracts a nested property from an object
- */
-export function getNestedValue<T>(obj: any, path: string): Nullable<T> {
-  return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+export interface TaskResult<T> {
+  data: T | null;
+  error: Error | null;
 }
 
 /**
- * Removes null or undefined values from an object
+ * Safely executes a promise and returns a standardized object.
  */
-export function cleanObject<T extends Record<string, any>>(obj: T): Partial<T> {
-  const result = { ...obj };
-  (Object.keys(result) as (keyof T)[]).forEach((key) => {
-    if (result[key] === null || result[key] === undefined) {
-      delete result[key];
-    }
-  });
-  return result;
-}
-
-/**
- * Formats data into a standardized JSON string for logs
- */
-export function formatPayload(data: unknown): string {
+export async function safeExecute<T>(fn: () => Promise<T>): Promise<TaskResult<T>> {
   try {
-    return JSON.stringify(data, null, 2);
-  } catch (error) {
-    return String(data);
+    const data = await fn();
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
   }
 }
 
 /**
- * Groups an array of objects by a specific key
+ * Delays execution for a specified duration in milliseconds.
  */
-export function groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
-  return array.reduce((acc, item) => {
-    const group = String(item[key]);
-    if (!acc[group]) {
-      acc[group] = [];
-    }
-    acc[group].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
+export const sleep = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Memoizes an object into a deep frozen configuration state.
+ */
+export function freezeConfig<T extends object>(config: T): Readonly<T> {
+  return Object.freeze({ ...config });
+}
+
+/**
+ * Normalizes string inputs for consistent key matching.
+ */
+export function formatKey(key: string): string {
+  return key.trim().toLowerCase().replace(/\s+/g, '_');
 }
