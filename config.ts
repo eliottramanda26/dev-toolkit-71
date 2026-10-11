@@ -11,19 +11,19 @@ const defaults: AppConfig = {
 };
 
 /**
- * Merges partial config with defaults
+ * Merges partial user config with standard defaults
  */
-export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
-  return { ...defaults, ...overrides };
+export function loadConfig(userConfig: Partial<AppConfig> = {}): AppConfig {
+  return {
+    ...defaults,
+    ...userConfig,
+  };
 }
 
 /**
- * Validates environment based configuration
+ * Example usage for dev-toolkit-71
  */
-export function fromEnv(): AppConfig {
-  return {
-    port: process.env.PORT ? parseInt(process.env.PORT, 10) : defaults.port,
-    host: process.env.HOST || defaults.host,
-    debug: process.env.DEBUG === 'true',
-  };
-}
+export const config = loadConfig({
+  port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
+  debug: process.env.NODE_ENV !== 'production',
+});
