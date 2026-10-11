@@ -1,36 +1,56 @@
-export interface TaskResult<T> {
-  data: T | null;
-  error: Error | null;
+export interface SafeExecOptions<T> {
+  fallback: T;
+  onError?: (error: Error) => void;
 }
 
-/**
- * Safely executes a promise and returns a standardized object.
- */
-export async function safeExecute<T>(fn: () => Promise<T>): Promise<TaskResult<T>> {
-  try {
-    const data = await fn();
-    return { data, error: null };
-  } catch (err) {
-    return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+export class MathBoundaryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MathBoundaryError';
   }
 }
 
 /**
- * Delays execution for a specified duration in milliseconds.
+ * Safely executes a synchronous function, returning fallback on edge case failure.
  */
-export const sleep = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Memoizes an object into a deep frozen configuration state.
- */
-export function freezeConfig<T extends object>(config: T): Readonly<T> {
-  return Object.freeze({ ...config });
+export function safeExecute<T>(fn: () => T, options: SafeExecOptions<T>): T {
+  try {
+    const result = fn();
+    if (result === undefined || result === null) {
+      return options.fallback;
+    }
+    return result;
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    options.onError?.(error);
+    return options.fallback;
+  }
 }
 
 /**
- * Normalizes string inputs for consistent key matching.
+ * Parses JSON string safely with edge-case checks for empty input or syntax errors.
  */
-export function formatKey(key: string): string {
-  return key.trim().toLowerCase().replace(/\s+/g, '_');
+export function safeJsonParse<T>(input: string, fallback: T): T {
+  if (typeof input !== 'string' || !input.trim()) {
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(input);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Safely clamps a numeric value, explicitly handling NaN and infinite values.
+ */
+export function safeClamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return Number.isNaN(value) ? min : (value > 0 ? max : min);
+  }
+  if (min > max) {
+    throw new MathBoundaryError(`Invalid bounds: min (${min}) > max (${max})`);
+  }
+  return Math.min(Math.max(value, min), max);
 }
