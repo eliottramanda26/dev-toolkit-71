@@ -1,29 +1,33 @@
-export interface RetryOptions {
-  maxAttempts: number;
-  delayMs: number;
+interface ProcessInput {
+  id: string;
+  value: number;
 }
 
 /**
- * Executes a function with exponential backoff retry logic
+ * Validates processing inputs for dev-toolkit-71 core loop
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
-): Promise<T> {
-  let lastError: unknown;
+export function validateInput(input: unknown): input is ProcessInput {
+  if (!input || typeof input !== 'object') return false;
 
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
+  const hasId = 'id' in input && typeof (input as any).id === 'string';
+  const hasValue = 'value' in input && typeof (input as any).value === 'number';
 
-      if (attempt < options.maxAttempts) {
-        const delay = options.delayMs * Math.pow(2, attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
+  return hasId && hasValue && (input as ProcessInput).value >= 0;
+}
+
+/**
+ * Orchestrates batch validation within the processing loop
+ */
+export function processBatch(items: unknown[]): ProcessInput[] {
+  const validItems: ProcessInput[] = [];
+
+  for (const item of items) {
+    if (validateInput(item)) {
+      validItems.push(item);
+    } else {
+      console.warn('Skipping invalid item in processing queue:', item);
     }
   }
 
-  throw lastError;
+  return validItems;
 }
