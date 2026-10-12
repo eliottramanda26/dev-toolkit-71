@@ -1,62 +1,28 @@
-export interface RetryOptions {
-  maxRetries: number;
-  delayMs: number;
-  backoffFactor: number;
-  onRetry?: (attempt: number, error: Error) => void;
-}
+/**
+ * dev-toolkit-71 helper utility functions
+ */
 
-const DEFAULT_OPTIONS: RetryOptions = {
-  maxRetries: 3,
-  delayMs: 1000,
-  backoffFactor: 2,
+export const delay = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+export const debounce = <T extends (...args: any[]) => any>(fn: T, wait: number) => {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<T>): void => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), wait);
+  };
 };
 
-/**
- * Executes an async network operation with exponential backoff retry logic.
- */
-export async function retryOperation<T>(
-  operation: () => Promise<T>,
-  options: Partial<RetryOptions> = {}
-): Promise<T> {
-  const config: RetryOptions = { ...DEFAULT_OPTIONS, ...options };
-  let currentDelay = config.delayMs;
+export const chunkArray = <T>(array: T[], size: number): T[][] => {
+  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
+    array.slice(i * size, i * size + size)
+  );
+};
 
-  for (let attempt = 1; attempt <= config.maxRetries + 1; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
+export const isDefined = <T>(value: T | null | undefined): value is T => {
+  return value !== null && value !== undefined;
+};
 
-      if (attempt > config.maxRetries) {
-        throw new Error(`Operation failed after ${config.maxRetries} retries: ${err.message}`);
-      }
-
-      if (config.onRetry) {
-        config.onRetry(attempt, err);
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, currentDelay));
-      currentDelay *= config.backoffFactor;
-    }
-  }
-
-  throw new Error('Unexpected end of retry loop');
-}
-
-/**
- * Wrapper around fetch that retries on server errors (5xx) or network failures.
- */
-export async function fetchWithRetry(
-  url: string,
-  init?: RequestInit,
-  retryOptions?: Partial<RetryOptions>
-): Promise<Response> {
-  return retryOperation(async () => {
-    const response = await fetch(url, init);
-    // Re-throw for 5xx errors to trigger retry
-    if (!response.ok && response.status >= 500) {
-      throw new Error(`Server returned HTTP status ${response.status}`);
-    }
-    return response;
-  }, retryOptions);
-}
+export const truncateString = (str: string, length: number): string => {
+  return str.length > length ? str.substring(0, length) + '...' : str;
+};
