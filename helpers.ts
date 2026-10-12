@@ -1,33 +1,34 @@
-interface ProcessInput {
-  id: string;
-  value: number;
-}
-
 /**
- * Validates processing inputs for dev-toolkit-71 core loop
+ * Memoizes function results for performance optimization.
+ * Limits cache growth to prevent memory leaks.
  */
-export function validateInput(input: unknown): input is ProcessInput {
-  if (!input || typeof input !== 'object') return false;
+export function memoize<T extends (...args: any[]) => any>(fn: T, limit: number = 100): T {
+  const cache = new Map<string, ReturnType<T>>();
 
-  const hasId = 'id' in input && typeof (input as any).id === 'string';
-  const hasValue = 'value' in input && typeof (input as any).value === 'number';
-
-  return hasId && hasValue && (input as ProcessInput).value >= 0;
-}
-
-/**
- * Orchestrates batch validation within the processing loop
- */
-export function processBatch(items: unknown[]): ProcessInput[] {
-  const validItems: ProcessInput[] = [];
-
-  for (const item of items) {
-    if (validateInput(item)) {
-      validItems.push(item);
-    } else {
-      console.warn('Skipping invalid item in processing queue:', item);
+  return ((...args: any[]) => {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) {
+      return cache.get(key);
     }
-  }
 
-  return validItems;
+    if (cache.size >= limit) {
+      const firstKey = cache.keys().next().value;
+      cache.delete(firstKey);
+    }
+
+    const result = fn(...args);
+    cache.set(key, result);
+    return result;
+  }) as T;
+}
+
+/**
+ * Batches execution to reduce event loop pressure.
+ */
+export function batchExecution<T>(items: T[], chunkSize: number = 50): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    chunks.push(items.slice(i, i + chunkSize));
+  }
+  return chunks;
 }
