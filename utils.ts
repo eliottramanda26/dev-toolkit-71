@@ -1,56 +1,36 @@
-export interface SafeExecOptions<T> {
-  fallback: T;
-  onError?: (error: Error) => void;
-}
-
-export class MathBoundaryError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'MathBoundaryError';
-  }
+interface ValidationResult {
+  isValid: boolean;
+  error?: string;
 }
 
 /**
- * Safely executes a synchronous function, returning fallback on edge case failure.
+ * schema validation for incoming processor payloads
  */
-export function safeExecute<T>(fn: () => T, options: SafeExecOptions<T>): T {
-  try {
-    const result = fn();
-    if (result === undefined || result === null) {
-      return options.fallback;
+export const validatePayload = (data: unknown): ValidationResult => {
+  if (typeof data !== 'object' || data === null) {
+    return { isValid: false, error: 'payload must be an object' };
+  }
+
+  const requiredFields = ['id', 'timestamp', 'payload'];
+  for (const field of requiredFields) {
+    if (!(field in data)) {
+      return { isValid: false, error: `missing field: ${field}` };
     }
-    return result;
-  } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    options.onError?.(error);
-    return options.fallback;
   }
-}
+
+  return { isValid: true };
+};
 
 /**
- * Parses JSON string safely with edge-case checks for empty input or syntax errors.
+ * processor loop input sanitation
  */
-export function safeJsonParse<T>(input: string, fallback: T): T {
-  if (typeof input !== 'string' || !input.trim()) {
-    return fallback;
-  }
-  try {
-    const parsed = JSON.parse(input);
-    return parsed ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
+export const processInput = (input: unknown): void => {
+  const validation = validatePayload(input);
 
-/**
- * Safely clamps a numeric value, explicitly handling NaN and infinite values.
- */
-export function safeClamp(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) {
-    return Number.isNaN(value) ? min : (value > 0 ? max : min);
+  if (!validation.isValid) {
+    console.error(`validation failed: ${validation.error}`);
+    return;
   }
-  if (min > max) {
-    throw new MathBoundaryError(`Invalid bounds: min (${min}) > max (${max})`);
-  }
-  return Math.min(Math.max(value, min), max);
-}
+
+  console.log('processing valid payload...');
+};
