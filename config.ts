@@ -1,30 +1,32 @@
-export interface CacheConfig {
-  maxSize: number;
-  ttlMs: number;
-  enableCompression: boolean;
+export interface AppConfig {
+  port: number;
+  host: string;
+  debug: boolean;
+}
+
+const defaults: AppConfig = {
+  port: 3000,
+  host: 'localhost',
+  debug: false,
+};
+
+/**
+ * Merges partial user configuration with system defaults
+ */
+export function loadConfig(userConfig: Partial<AppConfig>): AppConfig {
+  return {
+    ...defaults,
+    ...userConfig,
+  };
 }
 
 /**
- * optimized configuration module with memoization patterns
+ * Validates environment variables for critical settings
  */
-export const coreConfig: CacheConfig = {
-  maxSize: 1024 * 1024 * 50, // 50mb heap limit
-  ttlMs: 60000 * 5,
-  enableCompression: true
-};
-
-const memoMap = new Map<string, any>();
-
-export const getOptimizedConfig = <T>(key: string, compute: () => T): T => {
-  if (memoMap.has(key)) {
-    return memoMap.get(key);
-  }
-  
-  const result = compute();
-  memoMap.set(key, result);
-  return result;
-};
-
-export const clearConfigCache = (): void => {
-  memoMap.clear();
-};
+export function getEnvConfig(): AppConfig {
+  return {
+    port: parseInt(process.env.PORT || '') || defaults.port,
+    host: process.env.HOST || defaults.host,
+    debug: process.env.DEBUG === 'true',
+  };
+}
