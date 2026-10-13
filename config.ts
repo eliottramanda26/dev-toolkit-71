@@ -1,32 +1,30 @@
-export interface AppConfig {
+interface Config {
   port: number;
-  host: string;
+  env: string;
   debug: boolean;
 }
 
-const defaults: AppConfig = {
+const DEFAULT_CONFIG: Config = {
   port: 3000,
-  host: 'localhost',
+  env: 'development',
   debug: false,
 };
 
 /**
- * Merges partial user configuration with system defaults
+ * Merges partial config with defaults for dev-toolkit-71
  */
-export function loadConfig(userConfig: Partial<AppConfig>): AppConfig {
+export function loadConfig(userConfig: Partial<Config> = {}): Config {
   return {
-    ...defaults,
+    ...DEFAULT_CONFIG,
     ...userConfig,
   };
 }
 
 /**
- * Validates environment variables for critical settings
+ * Validates environment settings for strict mode
  */
-export function getEnvConfig(): AppConfig {
-  return {
-    port: parseInt(process.env.PORT || '') || defaults.port,
-    host: process.env.HOST || defaults.host,
-    debug: process.env.DEBUG === 'true',
-  };
+export function validateConfig(config: Config): void {
+  if (config.port < 1024 && config.env === 'production') {
+    throw new Error('privileged ports disallowed in production');
+  }
 }
