@@ -1,34 +1,41 @@
-/**
- * Memoizes function results for performance optimization.
- * Limits cache growth to prevent memory leaks.
- */
-export function memoize<T extends (...args: any[]) => any>(fn: T, limit: number = 100): T {
-  const cache = new Map<string, ReturnType<T>>();
-
-  return ((...args: any[]) => {
-    const key = JSON.stringify(args);
-    if (cache.has(key)) {
-      return cache.get(key);
-    }
-
-    if (cache.size >= limit) {
-      const firstKey = cache.keys().next().value;
-      cache.delete(firstKey);
-    }
-
-    const result = fn(...args);
-    cache.set(key, result);
-    return result;
-  }) as T;
+interface ProcessInput {
+  id: string;
+  value: number;
+  timestamp: number;
 }
 
 /**
- * Batches execution to reduce event loop pressure.
+ * Validates the schema and business logic for incoming data
  */
-export function batchExecution<T>(items: T[], chunkSize: number = 50): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += chunkSize) {
-    chunks.push(items.slice(i, i + chunkSize));
+export function validateInput(data: unknown): data is ProcessInput {
+  if (!data || typeof data !== 'object') return false;
+
+  const input = data as Partial<ProcessInput>;
+  
+  return (
+    typeof input.id === 'string' &&
+    typeof input.value === 'number' &&
+    !isNaN(input.value) &&
+    typeof input.timestamp === 'number' &&
+    input.timestamp > 0
+  );
+}
+
+/**
+ * Processing loop with integrated validation checks
+ */
+export function processBatch(items: unknown[]): void {
+  for (const item of items) {
+    if (!validateInput(item)) {
+      console.error('invalid record format detected, skipping');
+      continue;
+    }
+
+    try {
+      const { id, value } = item;
+      console.log(`processing item ${id} with value ${value}`);
+    } catch (err) {
+      console.error(`fatal error during batch processing: ${err}`);
+    }
   }
-  return chunks;
 }
