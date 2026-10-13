@@ -1,29 +1,30 @@
-export interface AppConfig {
-  port: number;
-  host: string;
-  debug: boolean;
+export interface CacheConfig {
+  maxSize: number;
+  ttlMs: number;
+  enableCompression: boolean;
 }
 
-const defaults: AppConfig = {
-  port: 3000,
-  host: 'localhost',
-  debug: false,
+/**
+ * optimized configuration module with memoization patterns
+ */
+export const coreConfig: CacheConfig = {
+  maxSize: 1024 * 1024 * 50, // 50mb heap limit
+  ttlMs: 60000 * 5,
+  enableCompression: true
 };
 
-/**
- * Merges partial user config with standard defaults
- */
-export function loadConfig(userConfig: Partial<AppConfig> = {}): AppConfig {
-  return {
-    ...defaults,
-    ...userConfig,
-  };
-}
+const memoMap = new Map<string, any>();
 
-/**
- * Example usage for dev-toolkit-71
- */
-export const config = loadConfig({
-  port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
-  debug: process.env.NODE_ENV !== 'production',
-});
+export const getOptimizedConfig = <T>(key: string, compute: () => T): T => {
+  if (memoMap.has(key)) {
+    return memoMap.get(key);
+  }
+  
+  const result = compute();
+  memoMap.set(key, result);
+  return result;
+};
+
+export const clearConfigCache = (): void => {
+  memoMap.clear();
+};
