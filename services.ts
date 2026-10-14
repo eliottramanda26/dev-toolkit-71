@@ -1,28 +1,41 @@
+interface CacheEntry<T> {
+  data: T;
+  expiry: number;
+}
+
+const cache = new Map<string, CacheEntry<any>>();
+const TTL_MS = 60000;
+
 /**
- * dev-toolkit-71 helper utility functions
+ * Memoized data retrieval for core operations
  */
+export async function getCachedData<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const cached = cache.get(key);
+  const now = Date.now();
 
-export const delay = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
+  if (cached && cached.expiry > now) {
+    return cached.data;
+  }
 
-export const debounce = <T extends (...args: any[]) => any>(fn: T, wait: number) => {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  return (...args: Parameters<T>): void => {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => fn(...args), wait);
-  };
-};
+  const result = await fetcher();
+  cache.set(key, {
+    data: result,
+    expiry: now + TTL_MS
+  });
 
-export const chunkArray = <T>(array: T[], size: number): T[][] => {
-  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
-    array.slice(i * size, i * size + size)
-  );
-};
+  return result;
+}
 
-export const isDefined = <T>(value: T | null | undefined): value is T => {
-  return value !== null && value !== undefined;
-};
+/**
+ * Batch processor for high-frequency updates
+ */
+export function batchProcess<T>(items: T[], processor: (batch: T[]) => void, size: number = 50): void {
+  for (let i = 0; i < items.length; i += size) {
+    const chunk = items.slice(i, i + size);
+    setTimeout(() => processor(chunk), 0);
+  }
+}
 
-export const truncateString = (str: string, length: number): string => {
-  return str.length > length ? str.substring(0, length) + '...' : str;
-};
+export function clearServiceCache(): void {
+  cache.clear();
+}
