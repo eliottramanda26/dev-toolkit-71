@@ -1,41 +1,41 @@
-interface CacheEntry<T> {
-  data: T;
-  expiry: number;
-}
-
-const cache = new Map<string, CacheEntry<any>>();
-const TTL_MS = 60000;
-
-/**
- * Memoized data retrieval for core operations
- */
-export async function getCachedData<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
-  const cached = cache.get(key);
-  const now = Date.now();
-
-  if (cached && cached.expiry > now) {
-    return cached.data;
-  }
-
-  const result = await fetcher();
-  cache.set(key, {
-    data: result,
-    expiry: now + TTL_MS
-  });
-
-  return result;
+interface ProcessingPayload {
+  id: string;
+  value: number;
+  timestamp: number;
 }
 
 /**
- * Batch processor for high-frequency updates
+ * Validates processing payloads to ensure data integrity
  */
-export function batchProcess<T>(items: T[], processor: (batch: T[]) => void, size: number = 50): void {
-  for (let i = 0; i < items.length; i += size) {
-    const chunk = items.slice(i, i + size);
-    setTimeout(() => processor(chunk), 0);
-  }
+export function validatePayload(data: unknown): data is ProcessingPayload {
+  if (!data || typeof data !== 'object') return false;
+
+  const { id, value, timestamp } = data as any;
+
+  return (
+    typeof id === 'string' &&
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    typeof timestamp === 'number' &&
+    timestamp > 0
+  );
 }
 
-export function clearServiceCache(): void {
-  cache.clear();
+/**
+ * Main loop execution handler with strict validation
+ */
+export function processQueue(queue: unknown[]): void {
+  for (const item of queue) {
+    if (!validatePayload(item)) {
+      console.warn('Invalid item skipped:', item);
+      continue;
+    }
+
+    try {
+      console.log(`Processing item ${item.id} with value ${item.value}`);
+      // Processing logic would follow here
+    } catch (error) {
+      console.error(`Fatal error processing ${item.id}:`, error);
+    }
+  }
 }
