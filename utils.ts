@@ -1,36 +1,31 @@
-interface ValidationResult {
-  isValid: boolean;
-  error?: string;
+export interface RetryOptions {
+  maxAttempts: number;
+  delayMs: number;
 }
 
 /**
- * schema validation for incoming processor payloads
+ * Executes a function with a simple exponential backoff retry mechanism
  */
-export const validatePayload = (data: unknown): ValidationResult => {
-  if (typeof data !== 'object' || data === null) {
-    return { isValid: false, error: 'payload must be an object' };
-  }
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
+): Promise<T> {
+  let lastError: unknown;
 
-  const requiredFields = ['id', 'timestamp', 'payload'];
-  for (const field of requiredFields) {
-    if (!(field in data)) {
-      return { isValid: false, error: `missing field: ${field}` };
+  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt === options.maxAttempts) {
+        break;
+      }
+
+      const backoffDelay = options.delayMs * Math.pow(2, attempt - 1);
+      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
     }
   }
 
-  return { isValid: true };
-};
-
-/**
- * processor loop input sanitation
- */
-export const processInput = (input: unknown): void => {
-  const validation = validatePayload(input);
-
-  if (!validation.isValid) {
-    console.error(`validation failed: ${validation.error}`);
-    return;
-  }
-
-  console.log('processing valid payload...');
-};
+  throw lastError;
+}
