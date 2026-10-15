@@ -1,41 +1,41 @@
-interface ProcessingPayload {
-  id: string;
-  value: number;
-  timestamp: number;
+interface ServiceResult<T> {
+  data: T | null;
+  error: Error | null;
 }
 
 /**
- * Validates processing payloads to ensure data integrity
+ * Wrapper for api calls to handle edge cases safely
  */
-export function validatePayload(data: unknown): data is ProcessingPayload {
-  if (!data || typeof data !== 'object') return false;
-
-  const { id, value, timestamp } = data as any;
-
-  return (
-    typeof id === 'string' &&
-    typeof value === 'number' &&
-    Number.isFinite(value) &&
-    typeof timestamp === 'number' &&
-    timestamp > 0
-  );
-}
-
-/**
- * Main loop execution handler with strict validation
- */
-export function processQueue(queue: unknown[]): void {
-  for (const item of queue) {
-    if (!validatePayload(item)) {
-      console.warn('Invalid item skipped:', item);
-      continue;
-    }
-
-    try {
-      console.log(`Processing item ${item.id} with value ${item.value}`);
-      // Processing logic would follow here
-    } catch (error) {
-      console.error(`Fatal error processing ${item.id}:`, error);
-    }
+export async function safeExecute<T>(task: () => Promise<T>): Promise<ServiceResult<T>> {
+  try {
+    const data = await task();
+    return { data, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error('Service execution failed:', error.message);
+    return { data: null, error };
   }
+}
+
+/**
+ * Validates object schema and handles null/undefined inputs
+ */
+export function validateInput<T>(input: T | null | undefined): T {
+  if (input === null || input === undefined) {
+    throw new Error('Received null or undefined input where data was expected');
+  }
+  return input;
+}
+
+/**
+ * Formats error responses for frontend consumption
+ */
+export function formatApiError(error: unknown): { message: string; code: number } {
+  if (error instanceof TypeError) {
+    return { message: 'Network connectivity issue', code: 503 };
+  }
+  return {
+    message: error instanceof Error ? error.message : 'An unexpected error occurred',
+    code: 500
+  };
 }
