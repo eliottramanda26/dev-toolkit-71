@@ -1,41 +1,41 @@
-interface ProcessInput {
+interface ProcessingInput {
   id: string;
   value: number;
   timestamp: number;
 }
 
 /**
- * Validates the schema and business logic for incoming data
+ * Validates processing input against schema requirements
  */
-export function validateInput(data: unknown): data is ProcessInput {
+export const validateInput = (data: unknown): data is ProcessingInput => {
   if (!data || typeof data !== 'object') return false;
 
-  const input = data as Partial<ProcessInput>;
-  
-  return (
+  const input = data as Record<string, unknown>;
+
+  const isValid = 
     typeof input.id === 'string' &&
     typeof input.value === 'number' &&
-    !isNaN(input.value) &&
+    Number.isFinite(input.value) &&
     typeof input.timestamp === 'number' &&
-    input.timestamp > 0
-  );
-}
+    input.timestamp > 0;
+
+  return isValid;
+};
 
 /**
- * Processing loop with integrated validation checks
+ * Main processing loop controller with validation
  */
-export function processBatch(items: unknown[]): void {
+export const processBatch = (items: unknown[]): void => {
   for (const item of items) {
     if (!validateInput(item)) {
-      console.error('invalid record format detected, skipping');
+      console.error('Invalid item format detected:', item);
       continue;
     }
 
     try {
-      const { id, value } = item;
-      console.log(`processing item ${id} with value ${value}`);
+      console.log(`Processing item ${item.id}: ${item.value}`);
     } catch (err) {
-      console.error(`fatal error during batch processing: ${err}`);
+      console.error(`Execution failed for item ${item.id}:`, err);
     }
   }
-}
+};
