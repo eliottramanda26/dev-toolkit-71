@@ -1,31 +1,40 @@
-export interface RetryOptions {
-  maxAttempts: number;
-  delayMs: number;
-}
-
 /**
- * Executes a function with a simple exponential backoff retry mechanism
+ * Utility functions for dev-toolkit-71
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
-): Promise<T> {
-  let lastError: unknown;
 
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-      
-      if (attempt === options.maxAttempts) {
-        break;
-      }
-
-      const backoffDelay = options.delayMs * Math.pow(2, attempt - 1);
-      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
-    }
-  }
-
-  throw lastError;
+export interface ProcessResult<T> {
+  data: T | null;
+  error: Error | null;
+  timestamp: number;
 }
+
+export const safeExecute = <T>(fn: () => T): ProcessResult<T> => {
+  try {
+    return { data: fn(), error: null, timestamp: Date.now() };
+  } catch (err) {
+    return { data: null, error: err as Error, timestamp: Date.now() };
+  }
+};
+
+export const sanitizeString = (input: string): string => {
+  return input.trim().replace(/[^a-zA-Z0-9]/g, '_');
+};
+
+export const throttle = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
+  let lastCall = 0;
+  return (...args: Parameters<T>) => {
+    const now = Date.now();
+    if (now - lastCall >= delay) {
+      lastCall = now;
+      fn(...args);
+    }
+  };
+};
+
+export const debounce = <T extends (...args: any[]) => void>(fn: T, wait: number) => {
+  let timeout: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), wait);
+  };
+};
