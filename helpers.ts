@@ -1,66 +1,39 @@
-/**
- * Utility helper functions for common string, object, and async operations.
- */
-
-/**
- * Converts a string into a URL-friendly slug.
- */
-export function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+export interface TaskResult<T> {
+  data: T | null;
+  error: Error | null;
 }
 
 /**
- * Truncates a string to a specified length and adds a suffix if needed.
+ * Safely executes an asynchronous operation with error encapsulation
  */
-export function truncate(text: string, maxLength: number, suffix = '...'): string {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength - suffix.length) + suffix;
-}
-
-/**
- * Debounces a function execution by a given delay in milliseconds.
- */
-export function debounce<T extends (...args: unknown[]) => void>(
-  func: T,
-  delayMs: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  return (...args: Parameters<T>) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      func(...args);
-    }, delayMs);
-  };
-}
-
-/**
- * Retries an asynchronous function a specified number of times before failing.
- */
-export async function retry<T>(
-  task: () => Promise<T>,
-  retries = 3,
-  delayMs = 200
-): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      return await task();
-    } catch (error) {
-      lastError = error;
-      if (attempt < retries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-    }
+export async function safeExecute<T>(fn: () => Promise<T>): Promise<TaskResult<T>> {
+  try {
+    const data = await fn();
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
   }
-
-  throw lastError;
 }
+
+/**
+ * Normalizes string input to handle nullish values
+ */
+export const formatString = (input: unknown): string => {
+  if (typeof input === 'string') return input.trim();
+  if (input === null || input === undefined) return '';
+  return String(input);
+};
+
+/**
+ * Pauses execution for a specified duration in milliseconds
+ */
+export const delay = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+/**
+ * Validates object schema structure presence
+ */
+export const isNotEmpty = (obj: Record<string, any>): boolean => {
+  return Object.keys(obj).length > 0;
+};
