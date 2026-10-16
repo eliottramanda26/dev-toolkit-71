@@ -1,40 +1,61 @@
 /**
- * Utility functions for dev-toolkit-71
+ * Bounded LRU cache implementation for fast lookup and memory safety
+ * during repetitive compute-heavy utility operations.
  */
+export class LRUCache<K, V> {
+  private readonly capacity: number;
+  private cache: Map<K, V>;
 
-export interface ProcessResult<T> {
-  data: T | null;
-  error: Error | null;
-  timestamp: number;
+  constructor(capacity: number = 128) {
+    this.capacity = capacity;
+    this.cache = new Map<K, V>();
+  }
+
+  public get(key: K): V | undefined {
+    if (!this.cache.has(key)) return undefined;
+
+    const value = this.cache.get(key)!;
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  public set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.capacity) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.cache.delete(oldestKey);
+      }
+    }
+    this.cache.set(key, value);
+  }
+
+  public clear(): void {
+    this.cache.clear();
+  }
 }
 
-export const safeExecute = <T>(fn: () => T): ProcessResult<T> => {
-  try {
-    return { data: fn(), error: null, timestamp: Date.now() };
-  } catch (err) {
-    return { data: null, error: err as Error, timestamp: Date.now() };
-  }
-};
+/**
+ * Wraps an expensive function with LRU cache memoization.
+ */
+export function memoize<T extends (...args: any[]) => any>(
+  fn: T,
+  cacheCapacity: number = 128
+): T {
+  const cache = new LRUCache<string, ReturnType<T>>(cacheCapacity);
 
-export const sanitizeString = (input: string): string => {
-  return input.trim().replace(/[^a-zA-Z0-9]/g, '_');
-};
+  return ((...args: Parameters<T>): ReturnType<T> => {
+    const key = JSON.stringify(args);
+    const cachedResult = cache.get(key);
 
-export const throttle = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
-  let lastCall = 0;
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - lastCall >= delay) {
-      lastCall = now;
-      fn(...args);
+    if (cachedResult !== undefined) {
+      return cachedResult;
     }
-  };
-};
 
-export const debounce = <T extends (...args: any[]) => void>(fn: T, wait: number) => {
-  let timeout: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => fn(...args), wait);
-  };
-};
+    const result = fn(...args);
+    cache.set(key, result);
+    return result;
+  }) as T;
+}
