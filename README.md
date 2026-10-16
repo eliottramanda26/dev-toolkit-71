@@ -1,60 +1,50 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-
 # dev-toolkit-71
 
-`dev-toolkit-71` is a modern, zero-dependency TypeScript utility library designed to streamline common data transformations, async operations, and environment configuration. Built for both Node.js and browser environments, it helps developers write type-safe, boilerplate-free code without introducing heavy bundle bloat.
+`dev-toolkit-71` is a robust collection of TypeScript utilities designed to streamline common development tasks in Node.js and browser environments. It provides type-safe wrappers for data sanitization, asynchronous flow control, and environment configuration management.
 
 ## Features
 
-* **Type-Safe Env Loader:** Parse and validate process environment variables with strict runtime checks and default fallbacks.
-* **Resilient Async Retries:** Execute asynchronous tasks with configurable exponential backoff and custom retry conditions.
-* **Deep Object Utilities:** Immutable object merging, type-safe path picking, and recursive key sanitization.
-* **Lightweight & Tree-Shakeable:** Zero external dependencies with full ESM and CommonJS support under 3kB minified.
+*   **Async Queue Manager:** A lightweight, promise-based task processor with concurrency limiting capabilities.
+*   **Object Transformation Suite:** Deep-merge and flattening utilities built with strict TypeScript generics for type safety.
+*   **Env Validator:** A schema-based environment variable loader that prevents runtime errors by validating configuration at startup.
+*   **Performance Benchmarker:** A simple, high-resolution timer utility for measuring function execution time in milliseconds.
 
 ## Installation
 
-Install via npm or your preferred package manager:
+Install the package via npm:
 
 ```bash
 npm install dev-toolkit-71
 ```
 
+Or using yarn:
+
 ```bash
-pnpm add dev-toolkit-71
+yarn add dev-toolkit-71
 ```
 
 ## Usage
 
-Here is a quick example demonstrating environment validation and async retries:
+Import the necessary utilities directly into your TypeScript project:
 
 ```typescript
-import { loadEnv, withRetry } from 'dev-toolkit-71';
+import { AsyncQueue, EnvValidator } from 'dev-toolkit-71';
 
-// 1. Validate and cast environment configuration
-const config = loadEnv({
-  PORT: { type: 'number', default: 3000 },
-  API_KEY: { type: 'string', required: true },
+// Validate environment variables
+const config = EnvValidator.parse({
+  PORT: process.env.PORT,
+  API_KEY: process.env.API_KEY
 });
 
-// 2. Perform resilient API calls with backoff
-async function fetchUserData(userId: string) {
-  return withRetry(
-    async () => {
-      const response = await fetch(`https://api.example.com/users/${userId}`, {
-        headers: { Authorization: `Bearer ${config.API_KEY}` },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed with status: ${response.status}`);
-      }
-
-      return response.json();
-    },
-    { retries: 3, delayMs: 500, backoffFactor: 2 }
-  );
-}
+// Manage concurrent tasks
+const queue = new AsyncQueue({ concurrency: 2 });
+queue.add(async () => {
+  console.log("Task executed safely.");
+});
 ```
 
 ## License
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Distributed under the MIT License. See `LICENSE` for more information.
