@@ -1,30 +1,33 @@
-interface Config {
-  port: number;
-  env: string;
-  debug: boolean;
+import * as winston from 'winston';
+import 'winston-daily-rotate-file';
+
+/**
+ * Configuration for application logging with daily rotation
+ */
+export const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.DailyRotateFile({
+      filename: 'logs/app-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '14d'
+    })
+  ]
+});
+
+export interface LogConfig {
+  serviceName: string;
+  logDir: string;
 }
 
-const DEFAULT_CONFIG: Config = {
-  port: 3000,
-  env: 'development',
-  debug: false,
+export const appConfig: LogConfig = {
+  serviceName: 'dev-toolkit-71',
+  logDir: './logs'
 };
-
-/**
- * Merges partial config with defaults for dev-toolkit-71
- */
-export function loadConfig(userConfig: Partial<Config> = {}): Config {
-  return {
-    ...DEFAULT_CONFIG,
-    ...userConfig,
-  };
-}
-
-/**
- * Validates environment settings for strict mode
- */
-export function validateConfig(config: Config): void {
-  if (config.port < 1024 && config.env === 'production') {
-    throw new Error('privileged ports disallowed in production');
-  }
-}
