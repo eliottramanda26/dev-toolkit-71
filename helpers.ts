@@ -1,25 +1,35 @@
-export const debounce = <T extends (...args: any[]) => void>(func: T, delay: number) => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
-  };
-};
+/**
+ * safely parses a json string into an object or returns a fallback value
+ */
+export function safeJsonParse<T>(json: string, fallback: T): T {
+  try {
+    return JSON.parse(json) as T;
+  } catch (err) {
+    return fallback;
+  }
+}
 
-export const getOrElse = <T>(value: T | null | undefined, defaultValue: T): T => {
-  return value ?? defaultValue;
-};
+/**
+ * extracts deep values from an object using a dot-notation string path
+ */
+export function getDeepValue(obj: Record<string, any>, path: string): any {
+  return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
+}
 
-export const isObject = (item: unknown): item is Record<string, unknown> => {
-  return typeof item === 'object' && item !== null && !Array.isArray(item);
-};
+/**
+ * filters out null and undefined values from an array while refining types
+ */
+export function filterDefined<T>(items: (T | null | undefined)[]): T[] {
+  return items.filter((item): item is T => item !== null && item !== undefined);
+}
 
-export const sleep = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
-
-export const chunkArray = <T>(array: T[], size: number): T[][] => {
-  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
-    array.slice(i * size, i * size + size)
-  );
-};
+/**
+ * chunks an array into smaller segments for batch processing
+ */
+export function chunkArray<T>(array: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
+}
