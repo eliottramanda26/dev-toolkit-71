@@ -1,33 +1,35 @@
-import * as winston from 'winston';
-import 'winston-daily-rotate-file';
-
-/**
- * Configuration for application logging with daily rotation
- */
-export const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.DailyRotateFile({
-      filename: 'logs/app-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      zippedArchive: true,
-      maxSize: '20m',
-      maxFiles: '14d'
-    })
-  ]
-});
-
-export interface LogConfig {
-  serviceName: string;
-  logDir: string;
+export interface AppConfig {
+  port: number;
+  debug: boolean;
+  apiEndpoint: string;
 }
 
-export const appConfig: LogConfig = {
-  serviceName: 'dev-toolkit-71',
-  logDir: './logs'
+const defaults: AppConfig = {
+  port: 3000,
+  debug: false,
+  apiEndpoint: 'https://api.dev-toolkit-71.com',
 };
+
+/**
+ * Merges user-defined configuration with system defaults
+ */
+export function loadConfig(userConfig: Partial<AppConfig> = {}): AppConfig {
+  return {
+    ...defaults,
+    ...userConfig,
+  };
+}
+
+/**
+ * Validates that port is within valid range
+ */
+export function validateConfig(config: AppConfig): boolean {
+  if (config.port < 1024 || config.port > 65535) {
+    console.error('Invalid port range');
+    return false;
+  }
+  return true;
+}
+
+// Usage example:
+// const config = loadConfig({ port: 8080 });
