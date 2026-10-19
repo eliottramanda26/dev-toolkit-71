@@ -1,36 +1,30 @@
-export type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
-
-/**
- * Safely executes a function and captures potential exceptions
- */
-export function safeExecute<T>(fn: () => T): Result<T> {
-  try {
-    return { success: true, data: fn() };
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    return { success: false, error: err };
-  }
+export interface RetryOptions {
+  maxRetries: number;
+  delayMs: number;
 }
 
 /**
- * Async variant for promise-based operations
+ * Executes a function with exponential backoff retry logic
  */
-export async function safeExecuteAsync<T>(promise: Promise<T>): Promise<Result<T>> {
-  try {
-    const data = await promise;
-    return { success: true, data };
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    return { success: false, error: err };
-  }
-}
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  options: RetryOptions = { maxRetries: 3, delayMs: 1000 }
+): Promise<T> {
+  let lastError: unknown;
 
-/**
- * Type guard to validate inputs against null or undefined
- */
-export function assertDefined<T>(value: T | null | undefined, message: string): T {
-  if (value === null || value === undefined) {
-    throw new Error(message);
+  for (let attempt = 0; attempt <= options.maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt === options.maxRetries) break;
+      
+      // Wait before next attempt, increasing delay exponentially
+      const backoff = options.delayMs * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, backoff));
+    }
   }
-  return value;
+
+  throw lastError;
 }
