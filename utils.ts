@@ -1,31 +1,36 @@
+export type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
+
 /**
- * Utility for safe deep property access and data transformation
+ * Safely executes a function and captures potential exceptions
  */
-
-export const getDeepValue = <T, K extends keyof T>(obj: T, path: string[]): any => {
-  return path.reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj as any);
-};
-
-export const isNotEmpty = <T>(value: T | null | undefined): value is T => {
-  return value !== null && value !== undefined;
-};
-
-export const sanitizeData = <T extends Record<string, any>>(data: T, allowedKeys: (keyof T)[]): Partial<T> => {
-  const sanitized: Partial<T> = {};
-  for (const key of allowedKeys) {
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
-      sanitized[key] = data[key];
-    }
+export function safeExecute<T>(fn: () => T): Result<T> {
+  try {
+    return { success: true, data: fn() };
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    return { success: false, error: err };
   }
-  return sanitized;
-};
+}
 
-export const chunkArray = <T>(array: T[], size: number): T[][] => {
-  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
-    array.slice(i * size, i * size + size)
-  );
-};
+/**
+ * Async variant for promise-based operations
+ */
+export async function safeExecuteAsync<T>(promise: Promise<T>): Promise<Result<T>> {
+  try {
+    const data = await promise;
+    return { success: true, data };
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    return { success: false, error: err };
+  }
+}
 
-export const generateId = (prefix: string = 'dev'): string => {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-};
+/**
+ * Type guard to validate inputs against null or undefined
+ */
+export function assertDefined<T>(value: T | null | undefined, message: string): T {
+  if (value === null || value === undefined) {
+    throw new Error(message);
+  }
+  return value;
+}
