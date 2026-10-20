@@ -1,35 +1,29 @@
+interface Config {
+  port: number;
+  host: string;
+  debug: boolean;
+}
+
+const defaults: Config = {
+  port: 3000,
+  host: 'localhost',
+  debug: false,
+};
+
 /**
- * safely parses a json string into an object or returns a fallback value
+ * Merges partial config with strict defaults
  */
-export function safeJsonParse<T>(json: string, fallback: T): T {
-  try {
-    return JSON.parse(json) as T;
-  } catch (err) {
-    return fallback;
-  }
+export function loadConfig(userConfig: Partial<Config>): Config {
+  return { ...defaults, ...userConfig };
 }
 
 /**
- * extracts deep values from an object using a dot-notation string path
+ * Validates environment variables for config schema
  */
-export function getDeepValue(obj: Record<string, any>, path: string): any {
-  return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
-}
-
-/**
- * filters out null and undefined values from an array while refining types
- */
-export function filterDefined<T>(items: (T | null | undefined)[]): T[] {
-  return items.filter((item): item is T => item !== null && item !== undefined);
-}
-
-/**
- * chunks an array into smaller segments for batch processing
- */
-export function chunkArray<T>(array: T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    result.push(array.slice(i, i + size));
-  }
-  return result;
+export function getEnvConfig(): Config {
+  return {
+    port: parseInt(process.env.PORT || '') || defaults.port,
+    host: process.env.HOST || defaults.host,
+    debug: process.env.DEBUG === 'true',
+  };
 }
