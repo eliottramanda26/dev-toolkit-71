@@ -1,35 +1,31 @@
-export interface AppConfig {
-  port: number;
-  debug: boolean;
-  apiEndpoint: string;
+export interface CacheConfig {
+  maxSize: number;
+  ttlMs: number;
 }
 
-const defaults: AppConfig = {
-  port: 3000,
-  debug: false,
-  apiEndpoint: 'https://api.dev-toolkit-71.com',
+export const DEFAULT_CONFIG: CacheConfig = {
+  maxSize: 1000,
+  ttlMs: 60000,
 };
 
 /**
- * Merges user-defined configuration with system defaults
+ * Memoized retrieval of configuration with performance optimization
+ * uses a simple singleton pattern to avoid object re-allocation
  */
-export function loadConfig(userConfig: Partial<AppConfig> = {}): AppConfig {
-  return {
-    ...defaults,
-    ...userConfig,
-  };
-}
+let cachedConfig: CacheConfig | null = null;
 
-/**
- * Validates that port is within valid range
- */
-export function validateConfig(config: AppConfig): boolean {
-  if (config.port < 1024 || config.port > 65535) {
-    console.error('Invalid port range');
-    return false;
+export const getOptimizedConfig = (overrides?: Partial<CacheConfig>): CacheConfig => {
+  if (!cachedConfig) {
+    cachedConfig = { ...DEFAULT_CONFIG };
   }
-  return true;
-}
 
-// Usage example:
-// const config = loadConfig({ port: 8080 });
+  if (!overrides || Object.keys(overrides).length === 0) {
+    return cachedConfig;
+  }
+
+  return { ...cachedConfig, ...overrides };
+};
+
+export const clearConfigCache = (): void => {
+  cachedConfig = null;
+};
