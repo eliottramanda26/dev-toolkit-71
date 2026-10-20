@@ -1,81 +1,59 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-export interface LoggerOptions {
-  logDir: string;
-  maxSizeBytes?: number;
-  maxFiles?: number;
-  logToConsole?: boolean;
+export interface MergeOptions {
+  arrayStrategy?: 'replace' | 'concat' | 'combineUnique';
+  skipUndefined?: boolean;
 }
 
-export type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+type GenericObject = Record<string, any>;
 
-export class RotatingLogger {
-  private logDir: string;
-  private maxSizeBytes: number;
-  private maxFiles: number;
-  private logToConsole: boolean;
-  private currentFilePath: string;
+function isObject(item: unknown): item is GenericObject {
+  return item !== null && typeof item === 'object' && !Array.isArray(item);
+}
 
-  constructor(options: LoggerOptions) {
-    this.logDir = options.logDir;
-    this.maxSizeBytes = options.maxSizeBytes ?? 1024 * 1024;
-    this.maxFiles = options.maxFiles ?? 5;
-    this.logToConsole = options.logToConsole ?? true;
-    this.currentFilePath = path.join(this.logDir, 'app.log');
+/**
+ * Deeply merges target and source objects based on configurable strategies.
+ */
+export function deepMerge<T extends GenericObject>(options: MergeOptions, target: T, ...sources: Partial<T>[]): T;
+export function deepMerge<T extends GenericObject>(target: T, ...sources: Partial<T>[]): T;
+export function deepMerge(first: any, ...rest: any[]): GenericObject {
+  let options: MergeOptions = { arrayStrategy: 'concat', skipUndefined: true };
+  let target: GenericObject;
+  let sources: GenericObject[];
 
-    if (!fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
-    }
+  if (first && ('arrayStrategy' in first || 'skipUndefined' in first)) {
+    options = { ...options, ...first };
+    target = rest[0] ? { ...rest[0] } : {};
+    sources = rest.slice(1);
+  } else {
+    target = first ? { ...first } : {};
+    sources = rest;
   }
 
-  private rotateLogs(): void {
-    if (!fs.existsSync(this.currentFilePath)) return;
+  for (const source of sources) {
+    if (!isObject(source)) continue;
 
-    const stats = fs.statSync(this.currentFilePath);
-    if (stats.size < this.maxSizeBytes) return;
+    for (const key of Object.keys(source)) {
+      const sourceVal = source[key];
+      const targetVal = target[key];
 
-    for (let i = this.maxFiles - 1; i >= 1; i--) {
-      const oldFile = path.join(this.logDir, `app.${i}.log`);
-      const newFile = path.join(this.logDir, `app.${i + 1}.log`);
-      if (fs.existsSync(oldFile)) {
-        if (i === this.maxFiles - 1) {
-          fs.unlinkSync(oldFile);
+      if (options.skipUndefined && sourceVal === undefined) {
+        continue;
+      }
+
+      if (Array.isArray(targetVal) && Array.isArray(sourceVal)) {
+        if (options.arrayStrategy === 'replace') {
+          target[key] = [...sourceVal];
+        } else if (options.arrayStrategy === 'combineUnique') {
+          target[key] = Array.from(new Set([...targetVal, ...sourceVal]));
         } else {
-          fs.renameSync(oldFile, newFile);
+          target[key] = [...targetVal, ...sourceVal];
         }
+      } else if (isObject(targetVal) && isObject(sourceVal)) {
+        target[key] = deepMerge(options, targetVal, sourceVal);
+      } else {
+        target[key] = sourceVal;
       }
     }
-
-    fs.renameSync(this.currentFilePath, path.join(this.logDir, 'app.1.log'));
   }
 
-  public log(level: LogLevel, message: string, context?: Record<string, unknown>): void {
-    const timestamp = new Date().toISOString();
-    const meta = context ? ` ${JSON.stringify(context)}` : '';
-    const entry = `[${timestamp}] [${level.toUpperCase()}] ${message}${meta}\n`;
-
-    if (this.logToConsole) {
-      process.stdout.write(entry);
-    }
-
-    this.rotateLogs();
-    fs.appendFileSync(this.currentFilePath, entry, 'utf-8');
-  }
-
-  public info(message: string, context?: Record<string, unknown>): void {
-    this.log('info', message, context);
-  }
-
-  public warn(message: string, context?: Record<string, unknown>): void {
-    this.log('warn', message, context);
-  }
-
-  public error(message: string, context?: Record<string, unknown>): void {
-    this.log('error', message, context);
-  }
-
-  public debug(message: string, context?: Record<string, unknown>): void {
-    this.log('debug', message, context);
-  }
+  return target;
 }
