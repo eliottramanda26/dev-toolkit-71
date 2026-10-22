@@ -1,84 +1,43 @@
+export interface PerformanceConfig {
+  cacheTtl: number;
+  batchSize: number;
+  enableMemoization: boolean;
+}
+
 /**
- * Configuration manager for developer toolkit services and environments.
+ * Configuration for core module performance optimizations
  */
-
-export type Environment = 'development' | 'staging' | 'production' | 'test';
-
-export interface AppConfig {
-  env: Environment;
-  port: number;
-  apiPrefix: string;
-  debug: boolean;
-  timeoutMs: number;
-  maxRetries: number;
-}
-
-export interface ConfigOptions {
-  overrides?: Partial<AppConfig>;
-  envSource?: Record<string, string | undefined>;
-}
-
-const DEFAULT_CONFIG: AppConfig = {
-  env: 'development',
-  port: 3000,
-  apiPrefix: '/api/v1',
-  debug: true,
-  timeoutMs: 5000,
-  maxRetries: 3,
+export const corePerformanceConfig: PerformanceConfig = {
+  cacheTtl: 300000,
+  batchSize: 50,
+  enableMemoization: true,
 };
 
 /**
- * Parses raw environment variables into typed configuration options.
- *
- * @param source - Raw key-value environment variable record
- * @returns Partial configuration object with parsed values
+ * Optimized cache implementation using Map for O(1) access
  */
-function parseEnvVars(source: Record<string, string | undefined>): Partial<AppConfig> {
-  const parsed: Partial<AppConfig> = {};
+export class PerformanceCache<K, V> {
+  private cache = new Map<K, { value: V; expiry: number }>();
 
-  if (source.NODE_ENV && ['development', 'staging', 'production', 'test'].includes(source.NODE_ENV)) {
-    parsed.env = source.NODE_ENV as Environment;
+  set(key: K, value: V): void {
+    const expiry = Date.now() + corePerformanceConfig.cacheTtl;
+    this.cache.set(key, { value, expiry });
   }
 
-  if (source.PORT) {
-    const parsedPort = parseInt(source.PORT, 10);
-    if (!isNaN(parsedPort) && parsedPort > 0) {
-      parsed.port = parsedPort;
+  get(key: K): V | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiry) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  clearExpired(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.expiry) this.cache.delete(key);
     }
   }
-
-  if (source.API_PREFIX) {
-    parsed.apiPrefix = source.API_PREFIX;
-  }
-
-  if (source.DEBUG !== undefined) {
-    parsed.debug = source.DEBUG.toLowerCase() === 'true' || source.DEBUG === '1';
-  }
-
-  if (source.TIMEOUT_MS) {
-    const parsedTimeout = parseInt(source.TIMEOUT_MS, 10);
-    if (!isNaN(parsedTimeout) && parsedTimeout > 0) {
-      parsed.timeoutMs = parsedTimeout;
-    }
-  }
-
-  return parsed;
-}
-
-/**
- * Loads and constructs application configuration combining defaults,
- * environment variables, and manual overrides.
- *
- * @param options - Configuration loading options including overrides and env source
- * @returns Fully populated application configuration object
- */
-export function loadConfig(options: ConfigOptions = {}): AppConfig {
-  const envSource = options.envSource || (typeof process !== 'undefined' ? process.env : {});
-  const envConfig = parseEnvVars(envSource);
-
-  return {
-    ...DEFAULT_CONFIG,
-    ...envConfig,
-    ...(options.overrides || {}),
-  };
 }
