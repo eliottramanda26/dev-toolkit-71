@@ -1,66 +1,91 @@
-/**
- * Common helper functions for dev-toolkit-71.
- * Reorganized into clear utility functions with standard type safety.
- */
+export interface ProcessingTask {
+  id: string;
+  payload: Record<string, unknown>;
+  priority?: number;
+  timeoutMs?: number;
+}
 
-/**
- * Safely parses a JSON string with a fallback value on failure.
- */
-export function safeJsonParse<T>(jsonString: string, fallback: T): T {
-  try {
-    return JSON.parse(jsonString) as T;
-  } catch {
-    return fallback;
-  }
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+export interface ProcessedResult<T> {
+  id: string;
+  success: boolean;
+  data?: T;
+  error?: string;
 }
 
 /**
- * Creates a new object with specified keys omitted.
+ * Validates an incoming task object against schema requirements before processing.
  */
-export function omit<T extends Record<string, any>, K extends keyof T>(
-  obj: T,
-  keys: K[]
-): Omit<T, K> {
-  const result = { ...obj };
-  for (const key of keys) {
-    delete result[key];
+export function validateTaskInput(task: unknown): ValidationResult {
+  const errors: string[] = [];
+
+  if (!task || typeof task !== 'object') {
+    return { isValid: false, errors: ['Task must be a non-null object'] };
   }
-  return result;
+
+  const t = task as Partial<ProcessingTask>;
+
+  if (!t.id || typeof t.id !== 'string' || t.id.trim() === '') {
+    errors.push('Task id must be a non-empty string');
+  }
+
+  if (!t.payload || typeof t.payload !== 'object' || Array.isArray(t.payload)) {
+    errors.push('Task payload must be a valid object');
+  }
+
+  if (t.priority !== undefined && (typeof t.priority !== 'number' || t.priority < 0)) {
+    errors.push('Task priority must be a non-negative number');
+  }
+
+  if (t.timeoutMs !== undefined && (typeof t.timeoutMs !== 'number' || t.timeoutMs <= 0)) {
+    errors.push('Task timeoutMs must be a positive number');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
 }
 
 /**
- * Creates a new object picking only specified keys.
+ * Main processing loop that applies input validation before execution.
  */
-export function pick<T extends Record<string, any>, K extends keyof T>(
-  obj: T,
-  keys: K[]
-): Pick<T, K> {
-  const result = {} as Pick<T, K>;
-  for (const key of keys) {
-    if (key in obj) {
-      result[key] = obj[key];
+export async function processTaskQueue<T>(
+  tasks: unknown[],
+  handler: (task: ProcessingTask) => Promise<T>
+): Promise<ProcessedResult<T>[]> {
+  const results: ProcessedResult<T>[] = [];
+
+  for (const rawTask of tasks) {
+    const validation = validateTaskInput(rawTask);
+
+    if (!validation.isValid) {
+      const fallbackId = (rawTask && typeof rawTask === 'object' && 'id' in rawTask)
+        ? String((rawTask as { id: unknown }).id)
+        : 'invalid-task-id';
+
+      results.push({
+        id: fallbackId,
+        success: false,
+        error: `Validation failed: ${validation.errors.join('; ')}`,
+      });
+      continue;
+    }
+
+    const validTask = rawTask as ProcessingTask;
+
+    try {
+      const output = await handler(validTask);
+      results.push({ id: validTask.id, success: true, data: output });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      results.push({ id: validTask.id, success: false, error: message });
     }
   }
-  return result;
-}
 
-/**
- * Pauses execution for a specified duration in milliseconds.
- */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Flattens an array up to specified depth.
- */
-export function flattenArray<T>(arr: (T | T[])[], depth = 1): T[] {
-  return arr.reduce<T[]>((acc, val) => {
-    if (Array.isArray(val) && depth > 0) {
-      acc.push(...flattenArray(val, depth - 1));
-    } else {
-      acc.push(val as T);
-    }
-    return acc;
-  }, []);
+  return results;
 }
