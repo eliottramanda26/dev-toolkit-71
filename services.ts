@@ -1,72 +1,53 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-export interface LoggerOptions {
-  logDir: string;
-  maxSizeBytes?: number;
-  maxFiles?: number;
+export interface ProcessingTask {
+  id: string;
+  payload: Record<string, unknown>;
+  priority?: number;
 }
 
-export class RotatingLoggerService {
-  private logDir: string;
-  private maxSizeBytes: number;
-  private maxFiles: number;
-  private currentFilePath: string;
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
 
-  constructor(options: LoggerOptions) {
-    this.logDir = options.logDir;
-    this.maxSizeBytes = options.maxSizeBytes ?? 1024 * 1024; // Default: 1MB
-    this.maxFiles = options.maxFiles ?? 5;
-    this.currentFilePath = path.join(this.logDir, 'app.log');
-
-    if (!fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
+export class TaskProcessingService {
+  private validateTask(task: unknown): ValidationResult {
+    const errors: string[] = [];
+    if (!task || typeof task !== 'object') {
+      return { isValid: false, errors: ['Task must be a non-null object'] };
     }
+
+    const t = task as Partial<ProcessingTask>;
+    if (!t.id || typeof t.id !== 'string' || t.id.trim() === '') {
+      errors.push('Task missing valid string id');
+    }
+    if (!t.payload || typeof t.payload !== 'object') {
+      errors.push('Task payload must be an object');
+    }
+    if (t.priority !== undefined && (typeof t.priority !== 'number' || t.priority < 0)) {
+      errors.push('Task priority must be a non-negative number');
+    }
+
+    return { isValid: errors.length === 0, errors };
   }
 
-  private rotateLogsIfNeeded(): void {
-    if (!fs.existsSync(this.currentFilePath)) return;
+  public async processBatch(rawTasks: unknown[]): Promise<{ processed: string[]; skipped: number }> {
+    const processed: string[] = [];
+    let skipped = 0;
 
-    const stats = fs.statSync(this.currentFilePath);
-    if (stats.size < this.maxSizeBytes) return;
-
-    for (let i = this.maxFiles - 1; i >= 1; i--) {
-      const sourcePath = path.join(this.logDir, `app.${i}.log`);
-      const targetPath = path.join(this.logDir, `app.${i + 1}.log`);
-
-      if (fs.existsSync(sourcePath)) {
-        if (i + 1 > this.maxFiles) {
-          fs.unlinkSync(sourcePath);
-        } else {
-          fs.renameSync(sourcePath, targetPath);
-        }
+    for (const rawTask of rawTasks) {
+      // Validate incoming raw input inside the processing loop
+      const validation = this.validateTask(rawTask);
+      if (!validation.isValid) {
+        console.warn(`[TaskProcessor] Skipping task: ${validation.errors.join('; ')}`);
+        skipped++;
+        continue;
       }
+
+      const task = rawTask as ProcessingTask;
+      // Perform processing logic on sanitized and validated item
+      processed.push(task.id);
     }
 
-    fs.renameSync(this.currentFilePath, path.join(this.logDir, 'app.1.log'));
-  }
-
-  public log(level: LogLevel, message: string): void {
-    this.rotateLogsIfNeeded();
-
-    const timestamp = new Date().toISOString();
-    const formattedMessage = `[${timestamp}] [${level.toUpperCase()}]: ${message}\n`;
-
-    process.stdout.write(formattedMessage);
-    fs.appendFileSync(this.currentFilePath, formattedMessage, 'utf-8');
-  }
-
-  public info(message: string): void {
-    this.log('info', message);
-  }
-
-  public warn(message: string): void {
-    this.log('warn', message);
-  }
-
-  public error(message: string): void {
-    this.log('error', message);
+    return { processed, skipped };
   }
 }
