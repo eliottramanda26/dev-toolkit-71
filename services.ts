@@ -1,53 +1,72 @@
-export interface ProcessingTask {
-  id: string;
-  payload: Record<string, unknown>;
-  priority?: number;
+export class ServiceError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly details?: unknown
+  ) {
+    super(message);
+    this.name = 'ServiceError';
+  }
 }
 
-export interface ValidationResult {
-  isValid: boolean;
-  errors: string[];
+export interface RequestOptions {
+  timeoutMs?: number;
+  maxRetries?: number;
 }
 
-export class TaskProcessingService {
-  private validateTask(task: unknown): ValidationResult {
-    const errors: string[] = [];
-    if (!task || typeof task !== 'object') {
-      return { isValid: false, errors: ['Task must be a non-null object'] };
-    }
+/**
+ * Executes a resilient HTTP fetch with timeout and retry logic for edge cases.
+ */
+export async function fetchWithRetry<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  const { timeoutMs = 3000, maxRetries = 2 } = options;
 
-    const t = task as Partial<ProcessingTask>;
-    if (!t.id || typeof t.id !== 'string' || t.id.trim() === '') {
-      errors.push('Task missing valid string id');
-    }
-    if (!t.payload || typeof t.payload !== 'object') {
-      errors.push('Task payload must be an object');
-    }
-    if (t.priority !== undefined && (typeof t.priority !== 'number' || t.priority < 0)) {
-      errors.push('Task priority must be a non-negative number');
-    }
-
-    return { isValid: errors.length === 0, errors };
+  if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+    throw new ServiceError('Invalid target URL provided', 'ERR_INVALID_URL', { url });
   }
 
-  public async processBatch(rawTasks: unknown[]): Promise<{ processed: string[]; skipped: number }> {
-    const processed: string[] = [];
-    let skipped = 0;
+  let attempt = 0;
+  let lastError: ServiceError | null = null;
 
-    for (const rawTask of rawTasks) {
-      // Validate incoming raw input inside the processing loop
-      const validation = this.validateTask(rawTask);
-      if (!validation.isValid) {
-        console.warn(`[TaskProcessor] Skipping task: ${validation.errors.join('; ')}`);
-        skipped++;
-        continue;
+  while (attempt <= maxRetries) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new ServiceError(`Request failed with status ${response.status}`, 'ERR_HTTP_STATUS', {
+          status: response.status,
+        });
       }
 
-      const task = rawTask as ProcessingTask;
-      // Perform processing logic on sanitized and validated item
-      processed.push(task.id);
-    }
+      const text = await response.text();
+      if (!text.trim()) {
+        throw new ServiceError('Received empty payload from server', 'ERR_EMPTY_RESPONSE');
+      }
 
-    return { processed, skipped };
+      return JSON.parse(text) as T;
+    } catch (err: unknown) {
+      clearTimeout(timeoutId);
+
+      if (err instanceof ServiceError) {
+        lastError = err;
+      } else if (err instanceof Error && err.name === 'AbortError') {
+        lastError = new ServiceError(`Operation timed out after ${timeoutMs}ms`, 'ERR_TIMEOUT');
+      } else {
+        const msg = err instanceof Error ? err.message : 'Unknown network failure';
+        lastError = new ServiceError(msg, 'ERR_NETWORK', err);
+      }
+
+      // Stop retrying on client errors or empty responses
+      if (lastError.code === 'ERR_HTTP_STATUS' || lastError.code === 'ERR_EMPTY_RESPONSE') {
+        break;
+      }
+
+      attempt++;
+    }
   }
+
+  throw lastError || new ServiceError('Service execution failed', 'ERR_UNKNOWN');
 }
