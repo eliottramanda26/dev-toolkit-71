@@ -1,32 +1,29 @@
-import * as winston from 'winston';
-import 'winston-daily-rotate-file';
-import { resolve } from 'path';
+export interface RetryOptions {
+  maxAttempts: number;
+  delayMs: number;
+}
 
 /**
- * Configuration for application logging with daily rotation
+ * Executes a function with exponential backoff retry logic
  */
-const logDirectory = resolve(__dirname, '../logs');
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
+): Promise<T> {
+  let lastError: unknown;
 
-const transport = new winston.transports.DailyRotateFile({
-  dirname: logDirectory,
-  filename: 'dev-toolkit-%DATE%.log',
-  datePattern: 'YYYY-MM-DD',
-  zippedArchive: true,
-  maxSize: '20m',
-  maxFiles: '14d',
-  level: 'info'
-});
+  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
 
-export const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    transport,
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
-});
+      if (attempt < options.maxAttempts) {
+        const backoff = options.delayMs * Math.pow(2, attempt - 1);
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+      }
+    }
+  }
+
+  throw lastError;
+}
