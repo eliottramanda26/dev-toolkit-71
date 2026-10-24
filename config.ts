@@ -1,43 +1,63 @@
-export interface PerformanceConfig {
-  cacheTtl: number;
-  batchSize: number;
-  enableMemoization: boolean;
+export interface AppConfig {
+  env: 'development' | 'staging' | 'production';
+  port: number;
+  host: string;
+  debug: boolean;
+  timeoutMs: number;
+  maxRetries: number;
 }
 
-/**
- * Configuration for core module performance optimizations
- */
-export const corePerformanceConfig: PerformanceConfig = {
-  cacheTtl: 300000,
-  batchSize: 50,
-  enableMemoization: true,
+export const defaultConfig: AppConfig = {
+  env: 'development',
+  port: 3000,
+  host: 'localhost',
+  debug: false,
+  timeoutMs: 5000,
+  maxRetries: 3,
 };
 
-/**
- * Optimized cache implementation using Map for O(1) access
- */
-export class PerformanceCache<K, V> {
-  private cache = new Map<K, { value: V; expiry: number }>();
+export class ConfigLoader<T extends Record<string, any>> {
+  private currentConfig: T;
 
-  set(key: K, value: V): void {
-    const expiry = Date.now() + corePerformanceConfig.cacheTtl;
-    this.cache.set(key, { value, expiry });
+  constructor(defaults: T) {
+    this.currentConfig = { ...defaults };
   }
 
-  get(key: K): V | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.expiry) {
-      this.cache.delete(key);
-      return null;
-    }
-    return entry.value;
+  /**
+   * Merges partial configuration overrides into current config.
+   */
+  public load(overrides: Partial<T> = {}): T {
+    this.currentConfig = {
+      ...this.currentConfig,
+      ...overrides,
+    };
+    return this.get();
   }
 
-  clearExpired(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.cache.entries()) {
-      if (now > entry.expiry) this.cache.delete(key);
+  /**
+   * Attempts to parse standard environment variable overrides.
+   */
+  public loadFromEnv(envMapping: Record<string, keyof T>): T {
+    const envOverrides: Partial<T> = {};
+
+    for (const [envVar, configKey] of Object.entries(envMapping)) {
+      const val = process.env[envVar];
+      if (val !== undefined) {
+        const defaultValue = this.currentConfig[configKey];
+        if (typeof defaultValue === 'number') {
+          envOverrides[configKey] = Number(val) as T[keyof T];
+        } else if (typeof defaultValue === 'boolean') {
+          envOverrides[configKey] = (val.toLowerCase() === 'true' || val === '1') as T[keyof T];
+        } else {
+          envOverrides[configKey] = val as T[keyof T];
+        }
+      }
     }
+
+    return this.load(envOverrides);
+  }
+
+  public get(): T {
+    return { ...this.currentConfig };
   }
 }
