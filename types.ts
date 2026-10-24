@@ -1,43 +1,34 @@
-/**
- * Core interface for toolkit processing units
- */
-export interface TaskDefinition {
-  id: string;
-  name: string;
-  priority: number;
-  metadata?: Record<string, unknown>;
+export type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
+
+export class DevToolkitError extends Error {
+  constructor(public message: string, public code: string, public context?: Record<string, unknown>) {
+    super(message);
+    this.name = 'DevToolkitError';
+  }
 }
 
 /**
- * Union type for operation outcomes
+ * safely execute async operations with standard error wrapping
  */
-export type OperationResult<T> = 
-  | { success: true; data: T }
-  | { success: false; error: string };
-
-/**
- * Configuration schema for the dev-toolkit-71 engine
- */
-export interface ToolkitConfig {
-  env: 'development' | 'production';
-  maxConcurrency: number;
-  retryAttempts: number;
-  enableCache: boolean;
+export async function safeExecute<T>(fn: () => Promise<T>): Promise<Result<T, DevToolkitError>> {
+  try {
+    const data = await fn();
+    return { success: true, data };
+  } catch (err) {
+    const error = err instanceof Error 
+      ? new DevToolkitError(err.message, 'RUNTIME_EXCEPTION', { original: err })
+      : new DevToolkitError('Unknown error occurred', 'UNKNOWN_ERROR', { err });
+    
+    return { success: false, error };
+  }
 }
 
 /**
- * Mapper for transformation utilities
+ * validate input types before process execution
  */
-export type Transformer<I, O> = (input: I) => O;
-
-/**
- * Generic constraint for toolkit service definitions
- */
-export type ServiceFactory<T> = (config: ToolkitConfig) => T;
-
-export const DEFAULT_CONFIG: ToolkitConfig = {
-  env: 'development',
-  maxConcurrency: 4,
-  retryAttempts: 3,
-  enableCache: true
-};
+export function assertNonEmpty<T>(value: T | null | undefined, name: string): T {
+  if (value === null || value === undefined) {
+    throw new DevToolkitError(`Value ${name} cannot be empty`, 'VALIDATION_ERROR');
+  }
+  return value;
+}
