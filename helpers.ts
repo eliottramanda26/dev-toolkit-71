@@ -1,38 +1,34 @@
-export interface RetryOptions {
-  retries: number;
-  delay: number;
-}
-
-/**
- * Executes a function with a simple exponential backoff retry mechanism
- */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = { retries: 3, delay: 1000 }
-): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= options.retries; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      if (attempt < options.retries) {
-        const backoff = options.delay * Math.pow(2, attempt);
-        await new Promise((resolve) => setTimeout(resolve, backoff));
-      }
-    }
+export class AppError extends Error {
+  constructor(public message: string, public statusCode: number = 500) {
+    super(message);
+    this.name = 'AppError';
   }
-
-  throw lastError;
 }
 
 /**
- * Wrapper to catch network specific errors with retry utility
+ * Safely executes async operations with error categorization
  */
-export const fetchWithRetry = <T>(
-  requestFn: () => Promise<T>,
-  maxRetries: number = 2
-) => {
-  return withRetry(requestFn, { retries: maxRetries, delay: 500 });
-};
+export async function safeExecute<T>(fn: () => Promise<T>): Promise<T | null> {
+  try {
+    return await fn();
+  } catch (error: unknown) {
+    if (error instanceof AppError) {
+      console.error(`[AppError ${error.statusCode}]: ${error.message}`);
+    } else if (error instanceof Error) {
+      console.error(`[Internal Error]: ${error.message}`);
+    } else {
+      console.error('[Unknown Error]: An unexpected issue occurred');
+    }
+    return null;
+  }
+}
+
+/**
+ * Type guard to validate input data presence
+ */
+export function ensureNotNull<T>(input: T | null | undefined, name: string): T {
+  if (input === null || input === undefined) {
+    throw new AppError(`Missing required dependency: ${name}`, 400);
+  }
+  return input;
+}
