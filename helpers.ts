@@ -1,68 +1,45 @@
-export type RecordObject = Record<string, any>;
-
-/**
- * Checks if a value is a plain JavaScript object.
- */
-export function isPlainObject(value: unknown): value is RecordObject {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    Object.prototype.toString.call(value) === '[object Object]'
-  );
+export interface RetryOptions {
+  maxRetries?: number;
+  delayMs?: number;
+  backoffFactor?: number;
+  shouldRetry?: (error: unknown) => boolean;
+  onRetry?: (attempt: number, error: unknown) => void;
 }
 
 /**
- * Safely retrieves a deeply nested value from an object using dot notation.
+ * Executes an asynchronous function with exponential backoff retry logic.
  */
-export function getNestedValue<T = unknown>(
-  target: RecordObject,
-  path: string,
-  defaultValue?: T
-): T | undefined {
-  if (!isPlainObject(target) || typeof path !== 'string') {
-    return defaultValue;
-  }
+export async function retryAsync<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const {
+    maxRetries = 3,
+    delayMs = 1000,
+    backoffFactor = 2,
+    shouldRetry = () => true,
+    onRetry,
+  } = options;
 
-  const keys = path.split('.').filter(Boolean);
-  let current: any = target;
+  let currentAttempt = 0;
+  let currentDelay = delayMs;
 
-  for (const key of keys) {
-    if (current === null || current === undefined || !Object.prototype.hasOwnProperty.call(current, key)) {
-      return defaultValue;
-    }
-    current = current[key];
-  }
+  while (true) {
+    try {
+      return await fn();
+    } catch (error) {
+      currentAttempt++;
 
-  return (current as T) ?? defaultValue;
-}
-
-/**
- * Deeply merges multiple source objects into a target object.
- */
-export function deepMerge<T extends RecordObject>(
-  target: T,
-  ...sources: Array<Partial<T> | RecordObject>
-): T {
-  if (!sources.length) return target;
-  const source = sources.shift();
-
-  if (isPlainObject(target) && isPlainObject(source)) {
-    for (const key of Object.keys(source)) {
-      const sourceValue = source[key];
-      const targetValue = target[key];
-
-      if (isPlainObject(sourceValue)) {
-        if (!isPlainObject(targetValue)) {
-          (target as RecordObject)[key] = {};
-        }
-        deepMerge((target as RecordObject)[key], sourceValue);
-      } else if (Array.isArray(sourceValue)) {
-        (target as RecordObject)[key] = [...sourceValue];
-      } else if (sourceValue !== undefined) {
-        (target as RecordObject)[key] = sourceValue;
+      if (currentAttempt > maxRetries || !shouldRetry(error)) {
+        throw error;
       }
+
+      if (onRetry) {
+        onRetry(currentAttempt, error);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, currentDelay));
+      currentDelay *= backoffFactor;
     }
   }
-
-  return deepMerge(target, ...sources);
 }
