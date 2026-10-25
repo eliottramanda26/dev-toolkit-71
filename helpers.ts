@@ -1,45 +1,33 @@
-export interface RetryOptions {
-  maxRetries?: number;
-  delayMs?: number;
-  backoffFactor?: number;
-  shouldRetry?: (error: unknown) => boolean;
-  onRetry?: (attempt: number, error: unknown) => void;
-}
-
 /**
- * Executes an asynchronous function with exponential backoff retry logic.
+ * Utility helpers for dev-toolkit-71
  */
-export async function retryAsync<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const {
-    maxRetries = 3,
-    delayMs = 1000,
-    backoffFactor = 2,
-    shouldRetry = () => true,
-    onRetry,
-  } = options;
 
-  let currentAttempt = 0;
-  let currentDelay = delayMs;
+export const debounce = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+};
 
-  while (true) {
-    try {
-      return await fn();
-    } catch (error) {
-      currentAttempt++;
+export const sleep = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-      if (currentAttempt > maxRetries || !shouldRetry(error)) {
-        throw error;
-      }
+export const formatCurrency = (amount: number, locale: string = 'en-US', currency: string = 'USD'): string => {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+  }).format(amount);
+};
 
-      if (onRetry) {
-        onRetry(currentAttempt, error);
-      }
+export const pick = <T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
+  const result = {} as Pick<T, K>;
+  keys.forEach((key) => {
+    if (key in obj) result[key] = obj[key];
+  });
+  return result;
+};
 
-      await new Promise((resolve) => setTimeout(resolve, currentDelay));
-      currentDelay *= backoffFactor;
-    }
-  }
-}
+export const isDefined = <T>(value: T | null | undefined): value is T => {
+  return value !== null && value !== undefined;
+};
