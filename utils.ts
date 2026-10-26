@@ -1,29 +1,42 @@
-export interface RetryOptions {
-  maxAttempts: number;
-  delayMs: number;
+/**
+ * Memoizes function results for improved performance.
+ * Utilizes a Map for O(1) average lookup times.
+ */
+export function memoize<T extends (...args: any[]) => any>(fn: T): T {
+  const cache = new Map<string, ReturnType<T>>();
+
+  return ((...args: Parameters<T>): ReturnType<T> => {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) {
+      return cache.get(key)!;
+    }
+    const result = fn(...args);
+    cache.set(key, result);
+    return result;
+  }) as T;
 }
 
 /**
- * Executes a function with exponential backoff retry logic
+ * Throttles execution of high-frequency events.
+ * Ensures limited processing overhead during window resize/scroll.
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = { maxAttempts: 3, delayMs: 1000 }
-): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-
-      if (attempt < options.maxAttempts) {
-        const backoff = options.delayMs * Math.pow(2, attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, backoff));
-      }
+export function throttle(fn: (...args: any[]) => void, delay: number) {
+  let lastCall = 0;
+  return (...args: any[]) => {
+    const now = Date.now();
+    if (now - lastCall >= delay) {
+      lastCall = now;
+      fn(...args);
     }
-  }
+  };
+}
 
-  throw lastError;
+/**
+ * Optimized batch processing for large data sets
+ * using generator functions to prevent event loop blocking.
+ */
+export function* chunkProcessor<T>(items: T[], size: number) {
+  for (let i = 0; i < items.length; i += size) {
+    yield items.slice(i, i + size);
+  }
 }
