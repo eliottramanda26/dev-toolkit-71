@@ -1,41 +1,39 @@
-interface CacheEntry<T> {
-  value: T;
-  expiry: number;
+interface ServiceResult<T> {
+  data: T | null;
+  error: string | null;
 }
 
-const cache = new Map<string, CacheEntry<any>>();
-const CACHE_TTL = 60000;
-
 /**
- * Optimized data retrieval with memoization
+ * Fetches data with basic validation and error catching
  */
-export async function getCachedData<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
-  const cached = cache.get(key);
-  const now = Date.now();
-
-  if (cached && cached.expiry > now) {
-    return cached.value;
-  }
-
+export async function fetchData<T>(url: string): Promise<ServiceResult<T>> {
   try {
-    const data = await fetcher();
-    cache.set(key, {
-      value: data,
-      expiry: now + CACHE_TTL
-    });
-    return data;
-  } catch (error) {
-    console.error(`Failed to fetch key: ${key}`, error);
-    throw error;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      return { data: null, error: `HTTP Error: ${response.status}` };
+    }
+
+    const data: T = await response.json();
+    return { data, error: null };
+  } catch (err) {
+    if (err instanceof TypeError) {
+      return { data: null, error: 'Network connectivity issue' };
+    }
+    return { 
+      data: null, 
+      error: err instanceof Error ? err.message : 'Unknown exception occurred' 
+    };
   }
 }
 
 /**
- * Batch processing utility to prevent event loop blocking
+ * Safely parses JSON strings
  */
-export function processInChunks<T>(items: T[], processor: (chunk: T[]) => void, size: number = 100): void {
-  for (let i = 0; i < items.length; i += size) {
-    const chunk = items.slice(i, i + size);
-    setTimeout(() => processor(chunk), 0);
+export function safeJsonParse<T>(json: string): T | null {
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return null;
   }
 }
