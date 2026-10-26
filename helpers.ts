@@ -1,33 +1,40 @@
 /**
- * Utility helpers for dev-toolkit-71
+ * dev-toolkit-71 helper utilities
  */
 
-export const debounce = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
+export interface TaskResult<T> {
+  success: boolean;
+  data: T | null;
+  error?: string;
+}
+
+/**
+ * Safely parses JSON strings with error handling
+ */
+export function safeParse<T>(json: string): TaskResult<T> {
+  try {
+    const parsed = JSON.parse(json) as T;
+    return { success: true, data: parsed };
+  } catch (err) {
+    return { success: false, data: null, error: 'invalid json format' };
+  }
+}
+
+/**
+ * Normalizes string inputs for toolkit consistency
+ */
+export const normalizeKey = (key: string): string => {
+  return key.trim().toLowerCase().replace(/\s+/g, '_');
 };
 
-export const sleep = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-export const formatCurrency = (amount: number, locale: string = 'en-US', currency: string = 'USD'): string => {
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-  }).format(amount);
-};
-
-export const pick = <T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
-  const result = {} as Pick<T, K>;
-  keys.forEach((key) => {
-    if (key in obj) result[key] = obj[key];
-  });
-  return result;
-};
-
-export const isDefined = <T>(value: T | null | undefined): value is T => {
-  return value !== null && value !== undefined;
-};
+/**
+ * Batch processes arrays to prevent stack overflow
+ */
+export function processChunks<T, R>(items: T[], chunkSize: number, callback: (chunk: T[]) => R[]): R[] {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    results.push(...callback(chunk));
+  }
+  return results;
+}
