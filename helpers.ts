@@ -1,40 +1,71 @@
 /**
- * dev-toolkit-71 helper utilities
+ * Generic object type for deep merge operations.
  */
+export type PlainObject = Record<string, any>;
 
-export interface TaskResult<T> {
-  success: boolean;
-  data: T | null;
-  error?: string;
+/**
+ * Checks if a value is a non-null, non-array object.
+ */
+function isObject(item: unknown): item is PlainObject {
+  return item !== null && typeof item === 'object' && !Array.isArray(item);
 }
 
 /**
- * Safely parses JSON strings with error handling
+ * Recursively merges properties of source objects into a target object.
+ * Handles nested objects and creates new references to prevent mutation.
+ *
+ * @param target The destination object
+ * @param sources One or more source objects to merge
+ * @returns The merged result object
  */
-export function safeParse<T>(json: string): TaskResult<T> {
-  try {
-    const parsed = JSON.parse(json) as T;
-    return { success: true, data: parsed };
-  } catch (err) {
-    return { success: false, data: null, error: 'invalid json format' };
+export function deepMerge<T extends PlainObject>(target: T, ...sources: Partial<T>[]): T {
+  if (!sources.length) return target;
+
+  const result: PlainObject = { ...target };
+
+  for (const source of sources) {
+    if (!isObject(source)) continue;
+
+    for (const key of Object.keys(source)) {
+      const targetVal = result[key];
+      const sourceVal = source[key];
+
+      if (Array.isArray(sourceVal)) {
+        result[key] = [...sourceVal];
+      } else if (isObject(sourceVal)) {
+        if (isObject(targetVal)) {
+          result[key] = deepMerge(targetVal, sourceVal);
+        } else {
+          result[key] = deepMerge({}, sourceVal);
+        }
+      } else if (sourceVal !== undefined) {
+        result[key] = sourceVal;
+      }
+    }
   }
+
+  return result as T;
 }
 
 /**
- * Normalizes string inputs for toolkit consistency
+ * Groups array items by a key or selector function.
+ *
+ * @param array Collection of items to group
+ * @param keySelector String key or function to determine grouping key
  */
-export const normalizeKey = (key: string): string => {
-  return key.trim().toLowerCase().replace(/\s+/g, '_');
-};
+export function groupBy<T>(
+  array: T[],
+  keySelector: keyof T | ((item: T) => string | number)
+): Record<string | number, T[]> {
+  return array.reduce((acc, item) => {
+    const key = typeof keySelector === 'function'
+      ? keySelector(item)
+      : (item[keySelector] as unknown as string | number);
 
-/**
- * Batch processes arrays to prevent stack overflow
- */
-export function processChunks<T, R>(items: T[], chunkSize: number, callback: (chunk: T[]) => R[]): R[] {
-  const results: R[] = [];
-  for (let i = 0; i < items.length; i += chunkSize) {
-    const chunk = items.slice(i, i + chunkSize);
-    results.push(...callback(chunk));
-  }
-  return results;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(item);
+    return acc;
+  }, {} as Record<string | number, T[]>);
 }
