@@ -1,34 +1,32 @@
-export type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
+export interface ApiError {
+  code: string;
+  message: string;
+  details?: unknown;
+}
 
-export class DevToolkitError extends Error {
-  constructor(public message: string, public code: string, public context?: Record<string, unknown>) {
-    super(message);
-    this.name = 'DevToolkitError';
+export class ToolkitError extends Error {
+  public readonly code: string;
+  public readonly details?: unknown;
+
+  constructor(error: ApiError) {
+    super(error.message);
+    this.name = 'ToolkitError';
+    this.code = error.code;
+    this.details = error.details;
   }
 }
 
-/**
- * safely execute async operations with standard error wrapping
- */
-export async function safeExecute<T>(fn: () => Promise<T>): Promise<Result<T, DevToolkitError>> {
-  try {
-    const data = await fn();
-    return { success: true, data };
-  } catch (err) {
-    const error = err instanceof Error 
-      ? new DevToolkitError(err.message, 'RUNTIME_EXCEPTION', { original: err })
-      : new DevToolkitError('Unknown error occurred', 'UNKNOWN_ERROR', { err });
-    
-    return { success: false, error };
-  }
-}
+export const handleUnknownError = (err: unknown): ToolkitError => {
+  if (err instanceof ToolkitError) return err;
+  
+  const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+  return new ToolkitError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message,
+    details: err
+  });
+};
 
-/**
- * validate input types before process execution
- */
-export function assertNonEmpty<T>(value: T | null | undefined, name: string): T {
-  if (value === null || value === undefined) {
-    throw new DevToolkitError(`Value ${name} cannot be empty`, 'VALIDATION_ERROR');
-  }
-  return value;
-}
+export type Result<T> = 
+  | { success: true; data: T }
+  | { success: false; error: ToolkitError };
