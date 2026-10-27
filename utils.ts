@@ -1,42 +1,58 @@
-/**
- * Memoizes function results for improved performance.
- * Utilizes a Map for O(1) average lookup times.
- */
-export function memoize<T extends (...args: any[]) => any>(fn: T): T {
-  const cache = new Map<string, ReturnType<T>>();
-
-  return ((...args: Parameters<T>): ReturnType<T> => {
-    const key = JSON.stringify(args);
-    if (cache.has(key)) {
-      return cache.get(key)!;
-    }
-    const result = fn(...args);
-    cache.set(key, result);
-    return result;
-  }) as T;
+export interface RetryOptions {
+  maxAttempts?: number;
+  delayMs?: number;
+  backoffFactor?: number;
+  shouldRetry?: (error: unknown) => boolean;
 }
 
 /**
- * Throttles execution of high-frequency events.
- * Ensures limited processing overhead during window resize/scroll.
+ * Retries an asynchronous operation with exponential backoff.
  */
-export function throttle(fn: (...args: any[]) => void, delay: number) {
-  let lastCall = 0;
-  return (...args: any[]) => {
-    const now = Date.now();
-    if (now - lastCall >= delay) {
-      lastCall = now;
-      fn(...args);
-    }
-  };
-}
+export async function retry<T>(
+  operation: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const {
+    maxAttempts = 3,
+    delayMs = 1000,
+    backoffFactor = 2,
+    shouldRetry = () => true,
+  } = options;
 
-/**
- * Optimized batch processing for large data sets
- * using generator functions to prevent event loop blocking.
- */
-export function* chunkProcessor<T>(items: T[], size: number) {
-  for (let i = 0; i < items.length; i += size) {
-    yield items.slice(i, i + size);
+  let attempt = 1;
+  let currentDelay = delayMs;
+
+  while (attempt <= maxAttempts) {
+    try {
+      return await operation();
+    } catch (error) {
+      const isLastAttempt = attempt === maxAttempts;
+      if (isLastAttempt || !shouldRetry(error)) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, currentDelay));
+      currentDelay *= backoffFactor;
+      attempt++;
+    }
   }
+
+  throw new Error('Retry attempts exhausted');
+}
+
+/**
+ * Wrapper for fetch requests with built-in retry functionality.
+ */
+export async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  options?: RetryOptions
+): Promise<Response> {
+  return retry(async () => {
+    const response = await fetch(input, init);
+    if (!response.ok && response.status >= 500) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return response;
+  }, options);
 }
