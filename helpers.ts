@@ -1,71 +1,44 @@
 /**
- * Generic object type for deep merge operations.
+ * Deeply clones an object and removes keys with null or undefined values.
+ * Useful for cleaning payload data before API requests.
  */
-export type PlainObject = Record<string, any>;
+export function sanitizePayload<T extends Record<string, any>>(data: T): Partial<T> {
+  const clean: any = {};
 
-/**
- * Checks if a value is a non-null, non-array object.
- */
-function isObject(item: unknown): item is PlainObject {
-  return item !== null && typeof item === 'object' && !Array.isArray(item);
-}
+  for (const key in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      const value = data[key];
 
-/**
- * Recursively merges properties of source objects into a target object.
- * Handles nested objects and creates new references to prevent mutation.
- *
- * @param target The destination object
- * @param sources One or more source objects to merge
- * @returns The merged result object
- */
-export function deepMerge<T extends PlainObject>(target: T, ...sources: Partial<T>[]): T {
-  if (!sources.length) return target;
-
-  const result: PlainObject = { ...target };
-
-  for (const source of sources) {
-    if (!isObject(source)) continue;
-
-    for (const key of Object.keys(source)) {
-      const targetVal = result[key];
-      const sourceVal = source[key];
-
-      if (Array.isArray(sourceVal)) {
-        result[key] = [...sourceVal];
-      } else if (isObject(sourceVal)) {
-        if (isObject(targetVal)) {
-          result[key] = deepMerge(targetVal, sourceVal);
+      if (value !== null && value !== undefined) {
+        if (typeof value === 'object' && !Array.isArray(value)) {
+          clean[key] = sanitizePayload(value);
         } else {
-          result[key] = deepMerge({}, sourceVal);
+          clean[key] = value;
         }
-      } else if (sourceVal !== undefined) {
-        result[key] = sourceVal;
       }
     }
   }
 
-  return result as T;
+  return clean as Partial<T>;
 }
 
 /**
- * Groups array items by a key or selector function.
- *
- * @param array Collection of items to group
- * @param keySelector String key or function to determine grouping key
+ * Groups an array of objects by a specific key.
  */
-export function groupBy<T>(
-  array: T[],
-  keySelector: keyof T | ((item: T) => string | number)
-): Record<string | number, T[]> {
-  return array.reduce((acc, item) => {
-    const key = typeof keySelector === 'function'
-      ? keySelector(item)
-      : (item[keySelector] as unknown as string | number);
-
-    if (!acc[key]) {
-      acc[key] = [];
+export function groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
+  return array.reduce((result, item) => {
+    const groupKey = String(item[key]);
+    if (!result[groupKey]) {
+      result[groupKey] = [];
     }
-    acc[key].push(item);
-    return acc;
-  }, {} as Record<string | number, T[]>);
+    result[groupKey].push(item);
+    return result;
+  }, {} as Record<string, T[]>);
+}
+
+/**
+ * Safe check for empty values (null, undefined, or empty string).
+ */
+export function isEmpty(value: unknown): boolean {
+  return value === null || value === undefined || value === '';
 }
