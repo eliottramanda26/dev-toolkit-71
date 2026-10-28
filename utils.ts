@@ -1,46 +1,28 @@
-/**
- * Utility functions for data processing in dev-toolkit-71
- */
-
-export type DataValue = string | number | boolean | null | undefined;
-
-/**
- * Deep clones an object using JSON serialization
- */
-export function deepClone<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
-}
-
-/**
- * Removes undefined and null values from an object
- */
-export function sanitizeData<T extends Record<string, any>>(obj: T): Partial<T> {
-  const result: any = {};
-  for (const key in obj) {
-    if (obj[key] !== undefined && obj[key] !== null) {
-      result[key] = obj[key];
-    }
+export class DevToolkitError extends Error {
+  constructor(public message: string, public code: string, public status: number = 500) {
+    super(message);
+    this.name = 'DevToolkitError';
   }
-  return result as Partial<T>;
 }
 
-/**
- * Groups an array of objects by a specific key
- */
-export function groupBy<T extends Record<string, any>>(array: T[], key: keyof T): Record<string, T[]> {
-  return array.reduce((acc, item) => {
-    const group = String(item[key]);
-    if (!acc[group]) {
-      acc[group] = [];
-    }
-    acc[group].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
+export function safeParseJson<T>(data: string, fallback: T): T {
+  try {
+    return JSON.parse(data) as T;
+  } catch (err) {
+    console.error('Failed to parse JSON, returning fallback:', err);
+    return fallback;
+  }
 }
 
-/**
- * Safe access to nested object properties
- */
-export function getNestedValue(obj: any, path: string[]): any {
-  return path.reduce((prev, curr) => (prev && prev[curr] !== undefined ? prev[curr] : undefined), obj);
+export async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new DevToolkitError('Operation timed out', 'TIMEOUT', 408)), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
+export function validateInput(input: unknown): asserts input is Record<string, any> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new DevToolkitError('Invalid input format', 'VALIDATION_ERROR', 400);
+  }
 }
