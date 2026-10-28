@@ -1,44 +1,43 @@
 /**
- * Deeply clones an object and removes keys with null or undefined values.
- * Useful for cleaning payload data before API requests.
+ * Utility functions for dev-toolkit-71
  */
-export function sanitizePayload<T extends Record<string, any>>(data: T): Partial<T> {
-  const clean: any = {};
-
-  for (const key in data) {
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
-      const value = data[key];
-
-      if (value !== null && value !== undefined) {
-        if (typeof value === 'object' && !Array.isArray(value)) {
-          clean[key] = sanitizePayload(value);
-        } else {
-          clean[key] = value;
-        }
-      }
-    }
-  }
-
-  return clean as Partial<T>;
-}
 
 /**
- * Groups an array of objects by a specific key.
+ * Safely deep clone an object using structured clone
  */
-export function groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
-  return array.reduce((result, item) => {
-    const groupKey = String(item[key]);
-    if (!result[groupKey]) {
-      result[groupKey] = [];
-    }
-    result[groupKey].push(item);
-    return result;
-  }, {} as Record<string, T[]>);
-}
+export const deepClone = <T>(obj: T): T => {
+  return structuredClone(obj);
+};
 
 /**
- * Safe check for empty values (null, undefined, or empty string).
+ * Delay execution for a specified duration
  */
-export function isEmpty(value: unknown): boolean {
-  return value === null || value === undefined || value === '';
-}
+export const sleep = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+/**
+ * Check if a value is a valid object
+ */
+export const isObject = (item: unknown): item is Record<string, unknown> => {
+  return item !== null && typeof item === 'object' && !Array.isArray(item);
+};
+
+/**
+ * Filter undefined keys from an object
+ */
+export const omitUndefined = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
+  return Object.entries(obj).reduce((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key as keyof T] = value;
+    }
+    return acc;
+  }, {} as Partial<T>);
+};
+
+/**
+ * Generate random hex string
+ */
+export const generateHex = (length: number): string => {
+  return Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+};
