@@ -1,58 +1,46 @@
-export interface RetryOptions {
-  maxAttempts?: number;
-  delayMs?: number;
-  backoffFactor?: number;
-  shouldRetry?: (error: unknown) => boolean;
+/**
+ * Utility functions for data processing in dev-toolkit-71
+ */
+
+export type DataValue = string | number | boolean | null | undefined;
+
+/**
+ * Deep clones an object using JSON serialization
+ */
+export function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
 }
 
 /**
- * Retries an asynchronous operation with exponential backoff.
+ * Removes undefined and null values from an object
  */
-export async function retry<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const {
-    maxAttempts = 3,
-    delayMs = 1000,
-    backoffFactor = 2,
-    shouldRetry = () => true,
-  } = options;
-
-  let attempt = 1;
-  let currentDelay = delayMs;
-
-  while (attempt <= maxAttempts) {
-    try {
-      return await operation();
-    } catch (error) {
-      const isLastAttempt = attempt === maxAttempts;
-      if (isLastAttempt || !shouldRetry(error)) {
-        throw error;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, currentDelay));
-      currentDelay *= backoffFactor;
-      attempt++;
+export function sanitizeData<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  for (const key in obj) {
+    if (obj[key] !== undefined && obj[key] !== null) {
+      result[key] = obj[key];
     }
   }
-
-  throw new Error('Retry attempts exhausted');
+  return result as Partial<T>;
 }
 
 /**
- * Wrapper for fetch requests with built-in retry functionality.
+ * Groups an array of objects by a specific key
  */
-export async function fetchWithRetry(
-  input: RequestInfo | URL,
-  init?: RequestInit,
-  options?: RetryOptions
-): Promise<Response> {
-  return retry(async () => {
-    const response = await fetch(input, init);
-    if (!response.ok && response.status >= 500) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+export function groupBy<T extends Record<string, any>>(array: T[], key: keyof T): Record<string, T[]> {
+  return array.reduce((acc, item) => {
+    const group = String(item[key]);
+    if (!acc[group]) {
+      acc[group] = [];
     }
-    return response;
-  }, options);
+    acc[group].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
+}
+
+/**
+ * Safe access to nested object properties
+ */
+export function getNestedValue(obj: any, path: string[]): any {
+  return path.reduce((prev, curr) => (prev && prev[curr] !== undefined ? prev[curr] : undefined), obj);
 }
