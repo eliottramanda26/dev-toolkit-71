@@ -1,43 +1,55 @@
 /**
- * Utility functions for dev-toolkit-71
+ * Utility helper functions for general data manipulation and validation.
  */
 
 /**
- * Safely deep clone an object using structured clone
+ * Truncates a string to a specified length and appends a suffix if trimmed.
  */
-export const deepClone = <T>(obj: T): T => {
-  return structuredClone(obj);
-};
+export function truncate(str: string, maxLength: number, suffix = '...'): string {
+  if (str.length <= maxLength) return str;
+  const effectiveLength = Math.max(0, maxLength - suffix.length);
+  return str.slice(0, effectiveLength) + suffix;
+}
 
 /**
- * Delay execution for a specified duration
+ * Splits an array into smaller chunks of a specified maximum size.
  */
-export const sleep = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
+export function chunk<T>(items: T[], size: number): T[][] {
+  if (size <= 0) throw new Error('Chunk size must be greater than 0');
+  const result: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    result.push(items.slice(i, i + size));
+  }
+  return result;
+}
 
 /**
- * Check if a value is a valid object
+ * Removes null and undefined values from an object.
  */
-export const isObject = (item: unknown): item is Record<string, unknown> => {
-  return item !== null && typeof item === 'object' && !Array.isArray(item);
-};
-
-/**
- * Filter undefined keys from an object
- */
-export const omitUndefined = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
-  return Object.entries(obj).reduce((acc, [key, value]) => {
-    if (value !== undefined) {
-      acc[key as keyof T] = value;
+export function compactObject<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== null && value !== undefined) {
+      cleaned[key] = value;
     }
-    return acc;
-  }, {} as Partial<T>);
-};
+  }
+  return cleaned as Partial<T>;
+}
 
 /**
- * Generate random hex string
+ * Type guard to filter out null and undefined values in array methods.
  */
-export const generateHex = (length: number): string => {
-  return Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-};
+export function isDefined<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
+/**
+ * Safely parses JSON with a default fallback if parsing fails.
+ */
+export function safeJsonParse<T>(jsonString: string, fallback: T): T {
+  try {
+    return JSON.parse(jsonString) as T;
+  } catch {
+    return fallback;
+  }
+}
