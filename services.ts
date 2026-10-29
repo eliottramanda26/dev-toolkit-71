@@ -1,42 +1,36 @@
-export interface ServiceConfig {
-  retryCount: number;
-  timeoutMs: number;
-}
-
-export interface ServiceResult<T> {
-  data: T | null;
-  error: string | null;
+interface ProcessInput {
+  id: string;
+  payload: Record<string, unknown>;
   timestamp: number;
 }
 
+const isValidInput = (input: unknown): input is ProcessInput => {
+  if (typeof input !== 'object' || input === null) return false;
+  const { id, payload, timestamp } = input as Record<string, unknown>;
+  return (
+    typeof id === 'string' &&
+    id.length > 0 &&
+    typeof payload === 'object' &&
+    typeof timestamp === 'number' &&
+    !isNaN(timestamp)
+  );
+};
+
 /**
- * Executes a data fetching operation with a predefined timeout
+ * Main processing loop with input validation
  */
-export async function fetchData<T>(url: string, config: ServiceConfig): Promise<ServiceResult<T>> {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), config.timeoutMs);
+export async function runProcessor(queue: unknown[]): Promise<void> {
+  for (const item of queue) {
+    if (!isValidInput(item)) {
+      console.error('Invalid input encountered, skipping item:', item);
+      continue;
+    }
 
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-
-    const data: T = await response.json();
-    return { data, error: null, timestamp: Date.now() };
-  } catch (err: unknown) {
-    return {
-      data: null,
-      error: err instanceof Error ? err.message : 'Unknown error occurred',
-      timestamp: Date.now(),
-    };
-  } finally {
-    clearTimeout(id);
+    try {
+      console.log(`Processing item ${item.id} at ${new Date(item.timestamp).toISOString()}`);
+      // Logic implementation would follow here
+    } catch (err) {
+      console.error('Processing error for item:', item.id, err);
+    }
   }
 }
-
-/**
- * Formats service status messages for display
- */
-export const formatStatus = (result: ServiceResult<unknown>): string => {
-  if (result.error) return `Failure: ${result.error}`;
-  return `Success at ${new Date(result.timestamp).toLocaleTimeString()}`;
-};
