@@ -1,42 +1,54 @@
-export interface DataItem {
-  id: string;
-  value: number;
-  timestamp: number;
+export interface DataServiceConfig {
+  endpoint: string;
+  timeout: number;
+  retries: number;
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  status: number;
+  message: string;
 }
 
 /**
- * Group data items by a specific key property
+ * Fetches generic data from the toolkit endpoint
+ * @param path - Resource route to append to base URL
+ * @returns Promise resolving to API response object
  */
-export function groupBy<T>(arr: T[], key: keyof T): Record<string, T[]> {
-  return arr.reduce((acc, item) => {
-    const group = String(item[key]);
-    if (!acc[group]) acc[group] = [];
-    acc[group].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
-}
+export async function fetchData<T>(path: string, config: DataServiceConfig): Promise<ApiResponse<T>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.timeout);
 
-/**
- * Delay execution for a specified number of milliseconds
- */
-export const sleep = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Safely parse JSON with a default fallback
- */
-export function safeParse<T>(json: string, fallback: T): T {
   try {
-    return JSON.parse(json);
-  } catch {
-    return fallback;
+    const response = await fetch(`${config.endpoint}/${path}`, {
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: T = await response.json();
+    return { data, status: response.status, message: 'success' };
+  } catch (error) {
+    return {
+      data: null as any,
+      status: 500,
+      message: error instanceof Error ? error.message : 'unknown error',
+    };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 /**
- * Calculate the average of a numeric array
+ * Formats toolkit payload for storage
+ * @param payload - Input object to sanitize
  */
-export function calculateAverage(numbers: number[]): number {
-  if (numbers.length === 0) return 0;
-  return numbers.reduce((a, b) => a + b, 0) / numbers.length;
+export function serializePayload<T extends Record<string, any>>(payload: T): string {
+  return JSON.stringify({
+    ...payload,
+    timestamp: Date.now(),
+    version: '1.0.0',
+  });
 }
