@@ -1,36 +1,42 @@
-interface ProcessInput {
+export interface DataItem {
   id: string;
-  payload: Record<string, unknown>;
+  value: number;
   timestamp: number;
 }
 
-const isValidInput = (input: unknown): input is ProcessInput => {
-  if (typeof input !== 'object' || input === null) return false;
-  const { id, payload, timestamp } = input as Record<string, unknown>;
-  return (
-    typeof id === 'string' &&
-    id.length > 0 &&
-    typeof payload === 'object' &&
-    typeof timestamp === 'number' &&
-    !isNaN(timestamp)
-  );
-};
+/**
+ * Group data items by a specific key property
+ */
+export function groupBy<T>(arr: T[], key: keyof T): Record<string, T[]> {
+  return arr.reduce((acc, item) => {
+    const group = String(item[key]);
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
+}
 
 /**
- * Main processing loop with input validation
+ * Delay execution for a specified number of milliseconds
  */
-export async function runProcessor(queue: unknown[]): Promise<void> {
-  for (const item of queue) {
-    if (!isValidInput(item)) {
-      console.error('Invalid input encountered, skipping item:', item);
-      continue;
-    }
+export const sleep = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-    try {
-      console.log(`Processing item ${item.id} at ${new Date(item.timestamp).toISOString()}`);
-      // Logic implementation would follow here
-    } catch (err) {
-      console.error('Processing error for item:', item.id, err);
-    }
+/**
+ * Safely parse JSON with a default fallback
+ */
+export function safeParse<T>(json: string, fallback: T): T {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return fallback;
   }
+}
+
+/**
+ * Calculate the average of a numeric array
+ */
+export function calculateAverage(numbers: number[]): number {
+  if (numbers.length === 0) return 0;
+  return numbers.reduce((a, b) => a + b, 0) / numbers.length;
 }
