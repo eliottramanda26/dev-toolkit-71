@@ -1,32 +1,30 @@
-import { createLogger, format, transports, Logger } from 'winston';
-import 'winston-daily-rotate-file';
-
 /**
- * Configuration for dev-toolkit-71 logger
+ * Utility functions for dev-toolkit-71
  */
-const logFormat = format.combine(
-  format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  format.errors({ stack: true }),
-  format.json()
-);
 
-export const logger: Logger = createLogger({
-  level: 'info',
-  format: logFormat,
-  transports: [
-    new transports.Console({
-      format: format.combine(format.colorize(), format.simple())
-    }),
-    new (transports as any).DailyRotateFile({
-      filename: 'logs/app-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      zippedArchive: true,
-      maxSize: '20m',
-      maxFiles: '14d'
-    })
-  ]
-});
+export const debounce = <T extends (...args: any[]) => void>(
+  fn: T,
+  delay: number
+): ((...args: Parameters<T>) => void) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+};
 
-export const logMessage = (level: 'info' | 'error' | 'warn', message: string, meta?: object): void => {
-  logger.log(level, message, meta);
+export const clamp = (value: number, min: number, max: number): number => {
+  return Math.min(Math.max(value, min), max);
+};
+
+export const sleep = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+export const isDefined = <T>(value: T | null | undefined): value is T => {
+  return value !== null && value !== undefined;
+};
+
+export const getObjectKeys = <T extends object>(obj: T): (keyof T)[] => {
+  return Object.keys(obj) as (keyof T)[];
 };
