@@ -1,30 +1,41 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 /**
- * Utility functions for dev-toolkit-71
+ * Minimal logger with file rotation support
+ * Keeps up to 5 log files of 1MB each
  */
+export class Logger {
+  private logPath: string;
+  private maxSize: number = 1024 * 1024;
 
-export const debounce = <T extends (...args: any[]) => void>(
-  fn: T,
-  delay: number
-): ((...args: Parameters<T>) => void) => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
-};
+  constructor(logPath: string) {
+    this.logPath = logPath;
+  }
 
-export const clamp = (value: number, min: number, max: number): number => {
-  return Math.min(Math.max(value, min), max);
-};
+  public log(message: string): void {
+    this.rotateIfNeeded();
+    const timestamp = new Date().toISOString();
+    const entry = `[${timestamp}] ${message}\n`;
+    fs.appendFileSync(this.logPath, entry);
+  }
 
-export const sleep = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
+  private rotateIfNeeded(): void {
+    if (!fs.existsSync(this.logPath)) return;
 
-export const isDefined = <T>(value: T | null | undefined): value is T => {
-  return value !== null && value !== undefined;
-};
+    const stats = fs.statSync(this.logPath);
+    if (stats.size > this.maxSize) {
+      this.performRotation();
+    }
+  }
 
-export const getObjectKeys = <T extends object>(obj: T): (keyof T)[] => {
-  return Object.keys(obj) as (keyof T)[];
-};
+  private performRotation(): void {
+    for (let i = 4; i >= 1; i--) {
+      const oldFile = i === 1 ? this.logPath : `${this.logPath}.${i - 1}`;
+      const newFile = `${this.logPath}.${i}`;
+      if (fs.existsSync(oldFile)) {
+        fs.renameSync(oldFile, newFile);
+      }
+    }
+  }
+}
