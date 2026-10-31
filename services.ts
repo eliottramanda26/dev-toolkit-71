@@ -1,43 +1,35 @@
-export interface ProcessingJob {
-  id: string;
-  payload: unknown;
-  timestamp: number;
-}
+export const delay = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-export class JobProcessor {
-  /**
-   * Validates job structure before processing
-   */
-  private isValid(job: unknown): job is ProcessingJob {
-    if (typeof job !== 'object' || job === null) return false;
-    const j = job as Record<string, unknown>;
-    return (
-      typeof j.id === 'string' &&
-      typeof j.timestamp === 'number' &&
-      j.payload !== undefined
-    );
+export const chunkArray = <T>(array: T[], size: number): T[][] =>
+  Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
+    array.slice(i * size, i * size + size)
+  );
+
+export const getUnique = <T>(array: T[], key?: keyof T): T[] => {
+  if (!key) return Array.from(new Set(array));
+  const seen = new Set();
+  return array.filter((item) => {
+    const val = item[key];
+    if (seen.has(val)) return false;
+    seen.add(val);
+    return true;
+  });
+};
+
+export const retry = async <T>(
+  fn: () => Promise<T>,
+  retries: number = 3,
+  backoff: number = 1000
+): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries <= 0) throw error;
+    await delay(backoff);
+    return retry(fn, retries - 1, backoff * 2);
   }
+};
 
-  /**
-   * Main loop for queue processing with validation
-   */
-  public async processQueue(jobs: unknown[]): Promise<void> {
-    for (const job of jobs) {
-      if (!this.isValid(job)) {
-        console.error('Invalid job schema detected', job);
-        continue;
-      }
-
-      try {
-        await this.handleJob(job);
-      } catch (err) {
-        console.error(`Failed to process job ${job.id}:`, err);
-      }
-    }
-  }
-
-  private async handleJob(job: ProcessingJob): Promise<void> {
-    // Business logic implementation
-    console.log(`Processing job: ${job.id}`);
-  }
-}
+export const capitalize = (str: string): string =>
+  str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
