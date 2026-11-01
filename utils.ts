@@ -1,41 +1,43 @@
-import * as fs from 'fs';
-import * as path from 'path';
+export interface ProcessingInput {
+  id: string;
+  value: number;
+  timestamp: number;
+}
 
 /**
- * Minimal logger with file rotation support
- * Keeps up to 5 log files of 1MB each
+ * validates structure and constraints of input data
+ * ensures values are within expected processing bounds
  */
-export class Logger {
-  private logPath: string;
-  private maxSize: number = 1024 * 1024;
+export function validateInput(input: unknown): input is ProcessingInput {
+  if (!input || typeof input !== 'object') return false;
 
-  constructor(logPath: string) {
-    this.logPath = logPath;
-  }
+  const { id, value, timestamp } = input as Partial<ProcessingInput>;
 
-  public log(message: string): void {
-    this.rotateIfNeeded();
-    const timestamp = new Date().toISOString();
-    const entry = `[${timestamp}] ${message}\n`;
-    fs.appendFileSync(this.logPath, entry);
-  }
+  return (
+    typeof id === 'string' &&
+    id.length > 0 &&
+    typeof value === 'number' &&
+    value >= 0 &&
+    value <= 1000 &&
+    typeof timestamp === 'number' &&
+    timestamp > 0
+  );
+}
 
-  private rotateIfNeeded(): void {
-    if (!fs.existsSync(this.logPath)) return;
-
-    const stats = fs.statSync(this.logPath);
-    if (stats.size > this.maxSize) {
-      this.performRotation();
+/**
+ * main processing loop runner with validation
+ */
+export function runProcessingLoop(data: unknown[]): void {
+  for (const item of data) {
+    if (!validateInput(item)) {
+      console.warn(`skipping invalid entry: ${JSON.stringify(item)}`);
+      continue;
     }
-  }
 
-  private performRotation(): void {
-    for (let i = 4; i >= 1; i--) {
-      const oldFile = i === 1 ? this.logPath : `${this.logPath}.${i - 1}`;
-      const newFile = `${this.logPath}.${i}`;
-      if (fs.existsSync(oldFile)) {
-        fs.renameSync(oldFile, newFile);
-      }
-    }
+    processItem(item);
   }
+}
+
+function processItem(item: ProcessingInput): void {
+  console.log(`processing item ${item.id} with value ${item.value}`);
 }
