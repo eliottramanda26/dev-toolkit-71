@@ -1,43 +1,40 @@
-export interface ProcessingInput {
+interface ProcessInput {
   id: string;
   value: number;
-  timestamp: number;
 }
 
 /**
- * validates structure and constraints of input data
- * ensures values are within expected processing bounds
+ * Validates processing inputs against business rules
  */
-export function validateInput(input: unknown): input is ProcessingInput {
-  if (!input || typeof input !== 'object') return false;
+export function validateInput(input: unknown): input is ProcessInput {
+  if (!input || typeof input !== 'object') {
+    return false;
+  }
 
-  const { id, value, timestamp } = input as Partial<ProcessingInput>;
+  const { id, value } = input as Record<string, unknown>;
 
   return (
     typeof id === 'string' &&
     id.length > 0 &&
     typeof value === 'number' &&
-    value >= 0 &&
-    value <= 1000 &&
-    typeof timestamp === 'number' &&
-    timestamp > 0
+    value >= 0
   );
 }
 
 /**
- * main processing loop runner with validation
+ * Processes items in the main loop with safety checks
  */
-export function runProcessingLoop(data: unknown[]): void {
-  for (const item of data) {
+export function runProcessingLoop(items: unknown[]): void {
+  for (const item of items) {
     if (!validateInput(item)) {
-      console.warn(`skipping invalid entry: ${JSON.stringify(item)}`);
+      console.error('Invalid input encountered, skipping item');
       continue;
     }
 
-    processItem(item);
+    try {
+      console.log(`Processing item: ${item.id} with value: ${item.value}`);
+    } catch (err) {
+      console.error(`Error processing item ${item.id}:`, err);
+    }
   }
-}
-
-function processItem(item: ProcessingInput): void {
-  console.log(`processing item ${item.id} with value ${item.value}`);
 }
