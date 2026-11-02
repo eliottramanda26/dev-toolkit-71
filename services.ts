@@ -1,35 +1,36 @@
-export const delay = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+interface ProcessingPayload {
+  id: string;
+  value: number;
+}
 
-export const chunkArray = <T>(array: T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
-    array.slice(i * size, i * size + size)
+/**
+ * Validates input against schema requirements
+ */
+const isValidPayload = (data: unknown): data is ProcessingPayload => {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'id' in data &&
+    typeof (data as any).id === 'string' &&
+    'value' in data &&
+    typeof (data as any).value === 'number'
   );
-
-export const getUnique = <T>(array: T[], key?: keyof T): T[] => {
-  if (!key) return Array.from(new Set(array));
-  const seen = new Set();
-  return array.filter((item) => {
-    const val = item[key];
-    if (seen.has(val)) return false;
-    seen.add(val);
-    return true;
-  });
 };
 
-export const retry = async <T>(
-  fn: () => Promise<T>,
-  retries: number = 3,
-  backoff: number = 1000
-): Promise<T> => {
-  try {
-    return await fn();
-  } catch (error) {
-    if (retries <= 0) throw error;
-    await delay(backoff);
-    return retry(fn, retries - 1, backoff * 2);
+/**
+ * Processes items in the main execution queue
+ */
+export const processQueue = (items: unknown[]): void => {
+  for (const item of items) {
+    if (!isValidPayload(item)) {
+      console.error('Invalid payload skipped:', item);
+      continue;
+    }
+
+    try {
+      console.log(`Processing item ${item.id} with value ${item.value}`);
+    } catch (err) {
+      console.error(`Execution failure for item ${item.id}:`, err);
+    }
   }
 };
-
-export const capitalize = (str: string): string =>
-  str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
