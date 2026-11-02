@@ -1,40 +1,33 @@
-interface ProcessInput {
-  id: string;
-  value: number;
-}
+import * as winston from 'winston';
+import 'winston-daily-rotate-file';
 
 /**
- * Validates processing inputs against business rules
+ * Configures a rotating file logger for dev-toolkit-71
  */
-export function validateInput(input: unknown): input is ProcessInput {
-  if (!input || typeof input !== 'object') {
-    return false;
-  }
+export const createLogger = (serviceName: string) => {
+  const transport = new winston.transports.DailyRotateFile({
+    filename: `logs/${serviceName}-%DATE%.log`,
+    datePattern: 'YYYY-MM-DD',
+    zippedArchive: true,
+    maxSize: '20m',
+    maxFiles: '14d',
+  });
 
-  const { id, value } = input as Record<string, unknown>;
+  return winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+      winston.format.timestamp(),
+      winston.format.json()
+    ),
+    transports: [
+      transport,
+      new winston.transports.Console({
+        format: winston.format.simple(),
+      }),
+    ],
+  });
+};
 
-  return (
-    typeof id === 'string' &&
-    id.length > 0 &&
-    typeof value === 'number' &&
-    value >= 0
-  );
-}
-
-/**
- * Processes items in the main loop with safety checks
- */
-export function runProcessingLoop(items: unknown[]): void {
-  for (const item of items) {
-    if (!validateInput(item)) {
-      console.error('Invalid input encountered, skipping item');
-      continue;
-    }
-
-    try {
-      console.log(`Processing item: ${item.id} with value: ${item.value}`);
-    } catch (err) {
-      console.error(`Error processing item ${item.id}:`, err);
-    }
-  }
-}
+// Usage example:
+// const logger = createLogger('main-app');
+// logger.info('System initialized');
