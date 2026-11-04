@@ -1,41 +1,70 @@
-interface Config {
-  port: number;
-  host: string;
-  debug: boolean;
-}
+/**
+ * General purpose utility helpers for object manipulation and formatting.
+ */
 
-const DEFAULT_CONFIG: Config = {
-  port: 3000,
-  host: 'localhost',
-  debug: false
-};
+export type Primitive = string | number | boolean | null | undefined;
 
 /**
- * Merges partial config with defaults
+ * Safely retrieves a nested property from an object using a dot-notation path.
  */
-export function loadConfig(userConfig: Partial<Config> = {}): Config {
-  return {
-    ...DEFAULT_CONFIG,
-    ...userConfig
-  };
-}
+export function getNestedValue<T = unknown>(obj: Record<string, any>, path: string, fallback?: T): T | undefined {
+  if (!obj || typeof obj !== 'object') {
+    return fallback;
+  }
+  const keys = path.split('.');
+  let current: any = obj;
 
-/**
- * Environment-aware configuration retrieval
- */
-export function getAppConfig(): Config {
-  const envConfig: Partial<Config> = {
-    port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
-    host: process.env.HOST,
-    debug: process.env.DEBUG === 'true'
-  };
-
-  // Remove undefined keys to prevent overriding defaults with undefined
-  Object.keys(envConfig).forEach((key) => {
-    if (envConfig[key as keyof Config] === undefined) {
-      delete envConfig[key as keyof Config];
+  for (const key of keys) {
+    if (current === null || current === undefined || !(key in current)) {
+      return fallback;
     }
-  });
+    current = current[key];
+  }
 
-  return loadConfig(envConfig);
+  return current as T;
+}
+
+/**
+ * Removes keys with null or undefined values from an object.
+ */
+export function compactObject<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== null && value !== undefined) {
+      result[key] = value;
+    }
+  }
+
+  return result as Partial<T>;
+}
+
+/**
+ * Truncates a string to a max length and appends a suffix if trimmed.
+ */
+export function truncateString(str: string, maxLength: number, suffix = '...'): string {
+  if (!str || str.length <= maxLength) {
+    return str;
+  }
+  const adjustedLength = Math.max(0, maxLength - suffix.length);
+  return str.slice(0, adjustedLength) + suffix;
+}
+
+/**
+ * Creates a simple debounced wrapper for a function.
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  fn: T,
+  delayMs: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<T>) => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      fn(...args);
+    }, delayMs);
+  };
 }
