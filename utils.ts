@@ -1,46 +1,35 @@
-/**
- * Utility functions for dev-toolkit-71
- */
+import * as fs from 'fs';
+import * as path from 'path';
 
-export type Nullable<T> = T | null | undefined;
-
-/**
- * Safely checks if a value is empty (null, undefined, or empty string/array)
- */
-export function isEmpty(value: unknown): boolean {
-  if (value === null || value === undefined) return true;
-  if (typeof value === 'string' || Array.isArray(value)) return value.length === 0;
-  if (typeof value === 'object') return Object.keys(value as object).length === 0;
-  return false;
+interface LoggerOptions {
+  logDir: string;
+  maxSizeMB: number;
 }
 
-/**
- * Deep clone helper using JSON serialization for plain objects
- */
-export function deepClone<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
-}
+export const setupLogger = (options: LoggerOptions) => {
+  const logFilePath = path.join(options.logDir, 'app.log');
 
-/**
- * Batched execution of a mapping function over an array
- */
-export function chunkArray<T>(array: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
+  if (!fs.existsSync(options.logDir)) {
+    fs.mkdirSync(options.logDir, { recursive: true });
   }
-  return chunks;
-}
 
-/**
- * Slugify string for normalized data handling
- */
-export function slugify(text: string): string {
-  return text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w-]+/g, '')
-    .replace(/--+/g, '-');
-}
+  const rotateLog = () => {
+    if (fs.existsSync(logFilePath)) {
+      const stats = fs.statSync(logFilePath);
+      if (stats.size > options.maxSizeMB * 1024 * 1024) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        fs.renameSync(logFilePath, `${logFilePath}.${timestamp}.old`);
+      }
+    }
+  };
+
+  return {
+    log: (message: string) => {
+      rotateLog();
+      const entry = `[${new Date().toISOString()}] ${message}\n`;
+      fs.appendFileSync(logFilePath, entry);
+    }
+  };
+};
+
+export const logger = setupLogger({ logDir: './logs', maxSizeMB: 5 });
