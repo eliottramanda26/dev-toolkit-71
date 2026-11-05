@@ -1,35 +1,34 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-interface LoggerOptions {
-  logDir: string;
-  maxSizeMB: number;
+export interface AppConfig {
+  port: number;
+  env: 'development' | 'production';
+  debug: boolean;
 }
 
-export const setupLogger = (options: LoggerOptions) => {
-  const logFilePath = path.join(options.logDir, 'app.log');
-
-  if (!fs.existsSync(options.logDir)) {
-    fs.mkdirSync(options.logDir, { recursive: true });
-  }
-
-  const rotateLog = () => {
-    if (fs.existsSync(logFilePath)) {
-      const stats = fs.statSync(logFilePath);
-      if (stats.size > options.maxSizeMB * 1024 * 1024) {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        fs.renameSync(logFilePath, `${logFilePath}.${timestamp}.old`);
-      }
-    }
-  };
-
-  return {
-    log: (message: string) => {
-      rotateLog();
-      const entry = `[${new Date().toISOString()}] ${message}\n`;
-      fs.appendFileSync(logFilePath, entry);
-    }
-  };
+const DEFAULT_CONFIG: AppConfig = {
+  port: 3000,
+  env: 'development',
+  debug: false,
 };
 
-export const logger = setupLogger({ logDir: './logs', maxSizeMB: 5 });
+/**
+ * Merges partial config with defaults for reliable startup
+ */
+export function loadConfig(userConfig: Partial<AppConfig>): AppConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    ...userConfig,
+  };
+}
+
+/**
+ * Helper to safely extract environment variable as fallback
+ */
+export function getConfigFromEnv(): Partial<AppConfig> {
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined;
+  const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+
+  return {
+    ...(port && { port }),
+    env,
+  };
+}
