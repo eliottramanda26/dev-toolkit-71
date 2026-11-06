@@ -1,34 +1,40 @@
+import { readFileSync } from 'fs';
+
+/**
+ * Configuration schema interface
+ */
 export interface AppConfig {
   port: number;
-  env: 'development' | 'production';
+  host: string;
   debug: boolean;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   port: 3000,
-  env: 'development',
+  host: 'localhost',
   debug: false,
 };
 
 /**
- * Merges partial config with defaults for reliable startup
+ * Loads and merges configuration with defaults
  */
-export function loadConfig(userConfig: Partial<AppConfig>): AppConfig {
-  return {
-    ...DEFAULT_CONFIG,
-    ...userConfig,
-  };
+export function loadConfig(path?: string): AppConfig {
+  try {
+    if (!path) return { ...DEFAULT_CONFIG };
+
+    const fileContent = readFileSync(path, 'utf-8');
+    const parsed: Partial<AppConfig> = JSON.parse(fileContent);
+
+    return { ...DEFAULT_CONFIG, ...parsed };
+  } catch (error) {
+    console.error('Failed to load config, falling back to defaults:', error);
+    return { ...DEFAULT_CONFIG };
+  }
 }
 
 /**
- * Helper to safely extract environment variable as fallback
+ * Validation helper for configuration integrity
  */
-export function getConfigFromEnv(): Partial<AppConfig> {
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined;
-  const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
-
-  return {
-    ...(port && { port }),
-    env,
-  };
+export function validateConfig(config: AppConfig): boolean {
+  return typeof config.port === 'number' && typeof config.host === 'string';
 }
