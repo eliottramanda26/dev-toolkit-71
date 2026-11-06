@@ -1,70 +1,41 @@
 /**
- * General purpose utility helpers for object manipulation and formatting.
+ * Utility functions for dev-toolkit-71 data management
  */
 
-export type Primitive = string | number | boolean | null | undefined;
+export type Nullable<T> = T | null | undefined;
 
 /**
- * Safely retrieves a nested property from an object using a dot-notation path.
+ * Safely deep clones a plain object using structuredClone
  */
-export function getNestedValue<T = unknown>(obj: Record<string, any>, path: string, fallback?: T): T | undefined {
-  if (!obj || typeof obj !== 'object') {
-    return fallback;
-  }
-  const keys = path.split('.');
-  let current: any = obj;
-
-  for (const key of keys) {
-    if (current === null || current === undefined || !(key in current)) {
-      return fallback;
-    }
-    current = current[key];
-  }
-
-  return current as T;
+export function cloneData<T>(data: T): T {
+  return structuredClone(data);
 }
 
 /**
- * Removes keys with null or undefined values from an object.
+ * Groups an array of objects by a specific key
  */
-export function compactObject<T extends Record<string, any>>(obj: T): Partial<T> {
-  const result: Record<string, any> = {};
-
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== null && value !== undefined) {
-      result[key] = value;
+export function groupBy<T extends Record<string, any>>(array: T[], key: keyof T): Record<string, T[]> {
+  return array.reduce((acc, item) => {
+    const group = String(item[key]);
+    if (!acc[group]) {
+      acc[group] = [];
     }
-  }
-
-  return result as Partial<T>;
+    acc[group].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
 }
 
 /**
- * Truncates a string to a max length and appends a suffix if trimmed.
+ * Normalizes input to an array to handle single/multiple items
  */
-export function truncateString(str: string, maxLength: number, suffix = '...'): string {
-  if (!str || str.length <= maxLength) {
-    return str;
-  }
-  const adjustedLength = Math.max(0, maxLength - suffix.length);
-  return str.slice(0, adjustedLength) + suffix;
+export function ensureArray<T>(input: Nullable<T | T[]>): T[] {
+  if (Array.isArray(input)) return input;
+  return input !== null && input !== undefined ? [input] : [];
 }
 
 /**
- * Creates a simple debounced wrapper for a function.
+ * Checks if a value is a non-null object
  */
-export function debounce<T extends (...args: any[]) => any>(
-  fn: T,
-  delayMs: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  return (...args: Parameters<T>) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      fn(...args);
-    }, delayMs);
-  };
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
