@@ -1,41 +1,32 @@
-export type Nullable<T> = T | null | undefined;
-
-/**
- * safely parses a json string returning a fallback value on error
- */
-export function safeJsonParse<T>(value: string, fallback: T): T {
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
+export class AppError extends Error {
+  constructor(public message: string, public statusCode: number = 500) {
+    super(message);
+    this.name = 'AppError';
   }
 }
 
 /**
- * removes null or undefined values from an object
+ * Safely executes async operations with error categorization
  */
-export function omitEmpty<T extends Record<string, any>>(obj: T): Partial<T> {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([_, v]) => v !== null && v !== undefined)
-  ) as Partial<T>;
+export async function safeExecute<T>(fn: () => Promise<T>): Promise<T | null> {
+  try {
+    return await fn();
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(`[dev-toolkit-71] Error: ${error.message}`);
+      if (error instanceof AppError && error.statusCode === 404) {
+        return null;
+      }
+    }
+    throw new Error('Critical failure in operation');
+  }
 }
 
 /**
- * creates a promise that resolves after a specified duration
+ * Validates object schema for edge cases
  */
-export const sleep = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * groups an array of objects by a specific key
- */
-export function groupBy<T>(arr: T[], key: keyof T): Record<string, T[]> {
-  return arr.reduce((acc, item) => {
-    const group = String(item[key]);
-    if (!acc[group]) {
-      acc[group] = [];
-    }
-    acc[group].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
+export function validatePayload(data: unknown): asserts data is Record<string, unknown> {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new AppError('Invalid payload structure', 400);
+  }
 }
