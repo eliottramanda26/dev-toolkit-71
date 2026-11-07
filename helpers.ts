@@ -1,37 +1,41 @@
-/**
- * Utility functions for dev-toolkit-71
- */
+export type Nullable<T> = T | null | undefined;
 
-export interface ToolkitConfig {
-  version: string;
-  debug: boolean;
+/**
+ * safely parses a json string returning a fallback value on error
+ */
+export function safeJsonParse<T>(value: string, fallback: T): T {
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
 }
 
-export const validateConfig = (config: unknown): config is ToolkitConfig => {
-  return (
-    typeof config === 'object' &&
-    config !== null &&
-    'version' in config &&
-    'debug' in config
-  );
-};
+/**
+ * removes null or undefined values from an object
+ */
+export function omitEmpty<T extends Record<string, any>>(obj: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([_, v]) => v !== null && v !== undefined)
+  ) as Partial<T>;
+}
 
-export const formatTimestamp = (date: Date): string => {
-  return date.toISOString().replace('T', ' ').substring(0, 19);
-};
+/**
+ * creates a promise that resolves after a specified duration
+ */
+export const sleep = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-export const throttle = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
-  let lastCall = 0;
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - lastCall >= delay) {
-      lastCall = now;
-      fn(...args);
+/**
+ * groups an array of objects by a specific key
+ */
+export function groupBy<T>(arr: T[], key: keyof T): Record<string, T[]> {
+  return arr.reduce((acc, item) => {
+    const group = String(item[key]);
+    if (!acc[group]) {
+      acc[group] = [];
     }
-  };
-};
-
-export const parseInput = (input: string): string[] => {
-  if (!input) return [];
-  return input.split(',').map((s) => s.trim()).filter(Boolean);
-};
+    acc[group].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
+}
