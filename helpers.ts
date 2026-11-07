@@ -1,41 +1,37 @@
 /**
- * Utility functions for dev-toolkit-71 data management
+ * Utility functions for dev-toolkit-71
  */
 
-export type Nullable<T> = T | null | undefined;
-
-/**
- * Safely deep clones a plain object using structuredClone
- */
-export function cloneData<T>(data: T): T {
-  return structuredClone(data);
+export interface ToolkitConfig {
+  version: string;
+  debug: boolean;
 }
 
-/**
- * Groups an array of objects by a specific key
- */
-export function groupBy<T extends Record<string, any>>(array: T[], key: keyof T): Record<string, T[]> {
-  return array.reduce((acc, item) => {
-    const group = String(item[key]);
-    if (!acc[group]) {
-      acc[group] = [];
+export const validateConfig = (config: unknown): config is ToolkitConfig => {
+  return (
+    typeof config === 'object' &&
+    config !== null &&
+    'version' in config &&
+    'debug' in config
+  );
+};
+
+export const formatTimestamp = (date: Date): string => {
+  return date.toISOString().replace('T', ' ').substring(0, 19);
+};
+
+export const throttle = <T extends (...args: any[]) => void>(fn: T, delay: number) => {
+  let lastCall = 0;
+  return (...args: Parameters<T>) => {
+    const now = Date.now();
+    if (now - lastCall >= delay) {
+      lastCall = now;
+      fn(...args);
     }
-    acc[group].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
-}
+  };
+};
 
-/**
- * Normalizes input to an array to handle single/multiple items
- */
-export function ensureArray<T>(input: Nullable<T | T[]>): T[] {
-  if (Array.isArray(input)) return input;
-  return input !== null && input !== undefined ? [input] : [];
-}
-
-/**
- * Checks if a value is a non-null object
- */
-export function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+export const parseInput = (input: string): string[] => {
+  if (!input) return [];
+  return input.split(',').map((s) => s.trim()).filter(Boolean);
+};
