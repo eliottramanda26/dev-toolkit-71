@@ -1,48 +1,44 @@
 /**
- * Utility collection for dev-toolkit-71
+ * Memoizes function results for improved core module throughput
  */
-
-export interface DevEntity {
-  id: string;
-  timestamp: number;
-  metadata: Record<string, unknown>;
+export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
+  const cache = new Map<T, R>();
+  return (arg: T): R => {
+    if (cache.has(arg)) {
+      return cache.get(arg)!;
+    }
+    const result = fn(arg);
+    cache.set(arg, result);
+    return result;
+  };
 }
 
 /**
- * Normalizes entity timestamps and validates presence
+ * Batches operation execution to reduce overhead
  */
-export const normalizeEntities = (entities: DevEntity[]): DevEntity[] => {
-  if (!Array.isArray(entities)) return [];
-
-  return entities.map((entity) => ({
-    ...entity,
-    timestamp: entity.timestamp || Date.now(),
-  }));
-};
-
-/**
- * Safely extracts metadata fields
- */
-export const getMetadataValue = <T = unknown>(
-  entity: DevEntity,
-  key: string
-): T | undefined => {
-  return entity.metadata?.[key] as T | undefined;
-};
+export function debounce<F extends (...args: any[]) => void>(fn: F, delay: number): (...args: Parameters<F>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<F>) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+}
 
 /**
- * Groups entities by a specific metadata key
+ * Optimized data lookup structure for core entities
  */
-export const groupByMetadata = (
-  entities: DevEntity[],
-  key: string
-): Record<string, DevEntity[]> => {
-  return entities.reduce((acc, entity) => {
-    const val = String(entity.metadata?.[key] ?? 'undefined');
-    if (!acc[val]) {
-      acc[val] = [];
-    }
-    acc[val].push(entity);
-    return acc;
-  }, {} as Record<string, DevEntity[]>);
-};
+export class EntityRegistry<T extends { id: string }> {
+  private registry: Map<string, T> = new Map();
+
+  add(item: T): void {
+    this.registry.set(item.id, item);
+  }
+
+  get(id: string): T | undefined {
+    return this.registry.get(id);
+  }
+
+  toArray(): T[] {
+    return Array.from(this.registry.values());
+  }
+}
