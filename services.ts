@@ -1,32 +1,34 @@
-export interface ProcessingJob {
+interface ProcessingPayload {
   id: string;
-  payload: unknown;
-  priority: number;
+  value: number;
 }
 
-export const validateJob = (job: unknown): job is ProcessingJob => {
-  if (typeof job !== 'object' || job === null) return false;
-  const j = job as Record<string, unknown>;
+/**
+ * Validates input against schema requirements
+ */
+const isValidPayload = (data: any): data is ProcessingPayload => {
   return (
-    typeof j.id === 'string' &&
-    typeof j.priority === 'number' &&
-    j.payload !== undefined
+    typeof data === 'object' &&
+    typeof data.id === 'string' &&
+    typeof data.value === 'number' &&
+    !isNaN(data.value)
   );
 };
 
-export const processQueue = (jobs: unknown[]): void => {
-  for (const rawJob of jobs) {
-    // Validate input before processing to prevent runtime errors
-    if (!validateJob(rawJob)) {
-      console.warn('Skipping invalid job schema detected:', rawJob);
+/**
+ * Main processing loop with integrated validation
+ */
+export const processInputBatch = (items: any[]): void => {
+  for (const item of items) {
+    if (!isValidPayload(item)) {
+      console.warn(`skipping invalid entry: ${JSON.stringify(item)}`);
       continue;
     }
 
     try {
-      console.log(`Processing job ${rawJob.id} with priority ${rawJob.priority}`);
-      // Additional processing logic here
-    } catch (err) {
-      console.error(`Execution failed for job ${rawJob.id}:`, err);
+      console.log(`processing item ${item.id} with value ${item.value}`);
+    } catch (error) {
+      console.error(`failed to process item ${item.id}:`, error);
     }
   }
 };
