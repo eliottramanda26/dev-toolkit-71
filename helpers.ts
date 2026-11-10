@@ -1,51 +1,39 @@
 /**
- * safely parses a json string with a fallback value
+ * Memoization utility for expensive operations
+ * Reduces recalculation overhead in core module
  */
-export function safeJsonParse<T>(json: string, fallback: T): T {
-  try {
-    return JSON.parse(json) as T;
-  } catch {
-    return fallback;
+export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
+  const cache = new Map<T, R>();
+
+  return (arg: T): R => {
+    if (cache.has(arg)) {
+      return cache.get(arg)!;
+    }
+    const result = fn(arg);
+    cache.set(arg, result);
+    return result;
+  };
+}
+
+/**
+ * Batched processor for high-frequency operations
+ * Limits event loop starvation in dev-toolkit-71
+ */
+export async function processInChunks<T>(
+  items: T[],
+  chunkSize: number,
+  processor: (item: T) => void
+): Promise<void> {
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    chunk.forEach(processor);
+    
+    // Yield to main thread to maintain responsiveness
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 }
 
-/**
- * groups an array of objects by a specific key
- */
-export function groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
-  return array.reduce((acc, item) => {
-    const groupKey = String(item[key]);
-    if (!acc[groupKey]) {
-      acc[groupKey] = [];
-    }
-    acc[groupKey].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
-}
-
-/**
- * extracts unique values from an array of objects based on a key
- */
-export function uniqueBy<T>(array: T[], key: keyof T): T[] {
-  const seen = new Set();
-  return array.filter((item) => {
-    const value = item[key];
-    if (seen.has(value)) {
-      return false;
-    }
-    seen.add(value);
-    return true;
-  });
-}
-
-/**
- * removes null or undefined values from an object
- */
-export function cleanObject<T extends Record<string, any>>(obj: T): Partial<T> {
-  return Object.entries(obj).reduce((acc, [key, value]) => {
-    if (value !== null && value !== undefined) {
-      acc[key as keyof T] = value;
-    }
-    return acc;
-  }, {} as Partial<T>);
-}
+export const optimizedCompute = memoize((input: string): number => {
+  // Simulate intensive transformation logic
+  return input.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+});
