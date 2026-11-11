@@ -1,39 +1,66 @@
 /**
- * Memoization utility for expensive operations
- * Reduces recalculation overhead in core module
+ * Common helper utilities for general application development.
  */
-export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
-  const cache = new Map<T, R>();
 
-  return (arg: T): R => {
-    if (cache.has(arg)) {
-      return cache.get(arg)!;
+/**
+ * Safely parses a JSON string, returning a fallback value if parsing fails.
+ */
+export function safeJsonParse<T>(jsonString: string, fallback: T): T {
+  try {
+    return JSON.parse(jsonString) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Converts a string into a URL-safe slug.
+ */
+export function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-');
+}
+
+/**
+ * Creates a debounced version of a function that delays execution until after
+ * the specified wait time has elapsed since the last call.
+ */
+export function debounce<T extends (...args: any[]) => void>(
+  fn: T,
+  delayMs: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<T>) => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
     }
-    const result = fn(arg);
-    cache.set(arg, result);
-    return result;
+    timeoutId = setTimeout(() => {
+      fn(...args);
+    }, delayMs);
   };
 }
 
 /**
- * Batched processor for high-frequency operations
- * Limits event loop starvation in dev-toolkit-71
+ * Splits an array into smaller chunks of a specified maximum size.
  */
-export async function processInChunks<T>(
-  items: T[],
-  chunkSize: number,
-  processor: (item: T) => void
-): Promise<void> {
-  for (let i = 0; i < items.length; i += chunkSize) {
-    const chunk = items.slice(i, i + chunkSize);
-    chunk.forEach(processor);
-    
-    // Yield to main thread to maintain responsiveness
-    await new Promise((resolve) => setTimeout(resolve, 0));
+export function chunkArray<T>(items: T[], size: number): T[][] {
+  if (size <= 0) return [items];
+  const result: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    result.push(items.slice(i, i + size));
   }
+  return result;
 }
 
-export const optimizedCompute = memoize((input: string): number => {
-  // Simulate intensive transformation logic
-  return input.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-});
+/**
+ * Pauses execution for a specified number of milliseconds.
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
