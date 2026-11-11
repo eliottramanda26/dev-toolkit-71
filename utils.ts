@@ -1,41 +1,33 @@
-export interface RetryOptions {
-  maxRetries?: number;
-  delayMs?: number;
-  backoffFactor?: number;
-  shouldRetry?: (error: unknown) => boolean;
-}
-
 /**
- * Executes an asynchronous task with configurable retry logic and exponential backoff.
+ * Utility functions for dev-toolkit-71
  */
-export async function retryOperation<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const {
-    maxRetries = 3,
-    delayMs = 500,
-    backoffFactor = 2,
-    shouldRetry = () => true,
-  } = options;
 
-  let attempt = 0;
-  let currentDelay = delayMs;
+export const debounce = <T extends (...args: any[]) => void>(
+  fn: T, 
+  delay: number
+): (...args: Parameters<T>) => void => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+};
 
-  while (true) {
-    try {
-      attempt++;
-      return await operation();
-    } catch (error) {
-      const isLastAttempt = attempt > maxRetries;
-      const canRetry = shouldRetry(error);
+export const delay = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-      if (isLastAttempt || !canRetry) {
-        throw error;
-      }
+export const capitalize = (str: string): string => 
+  str.charAt(0).toUpperCase() + str.slice(1);
 
-      await new Promise((resolve) => setTimeout(resolve, currentDelay));
-      currentDelay *= backoffFactor;
-    }
-  }
-}
+export const getOrElse = <T>(value: T | null | undefined, defaultValue: T): T => 
+  (value !== null && value !== undefined) ? value : defaultValue;
+
+export const chunkArray = <T>(array: T[], size: number): T[][] => {
+  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
+    array.slice(i * size, i * size + size)
+  );
+};
+
+export const isObject = (item: unknown): item is Record<string, unknown> => {
+  return !!item && typeof item === 'object' && !Array.isArray(item);
+};
