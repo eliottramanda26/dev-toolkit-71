@@ -1,36 +1,35 @@
 /**
- * Common helper utilities for general application development.
+ * Common utility helper functions for data manipulation and function control.
  */
 
 /**
- * Safely parses a JSON string, returning a fallback value if parsing fails.
+ * Creates a deep clone of a plain object, array, or Date instance.
  */
-export function safeJsonParse<T>(jsonString: string, fallback: T): T {
-  try {
-    return JSON.parse(jsonString) as T;
-  } catch {
-    return fallback;
+export function deepClone<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
   }
+
+  if (obj instanceof Date) {
+    return new Date(obj.getTime()) as unknown as T;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => deepClone(item)) as unknown as T;
+  }
+
+  const clonedObj = {} as Record<string, unknown>;
+  for (const key of Object.keys(obj as Record<string, unknown>)) {
+    clonedObj[key] = deepClone((obj as Record<string, unknown>)[key]);
+  }
+
+  return clonedObj as T;
 }
 
 /**
- * Converts a string into a URL-safe slug.
+ * Debounces a function call by waiting for a specified delay in milliseconds.
  */
-export function slugify(text: string): string {
-  return text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w\-]+/g, '')
-    .replace(/\-\-+/g, '-');
-}
-
-/**
- * Creates a debounced version of a function that delays execution until after
- * the specified wait time has elapsed since the last call.
- */
-export function debounce<T extends (...args: any[]) => void>(
+export function debounce<T extends (...args: any[]) => any>(
   fn: T,
   delayMs: number
 ): (...args: Parameters<T>) => void {
@@ -42,6 +41,7 @@ export function debounce<T extends (...args: any[]) => void>(
     }
     timeoutId = setTimeout(() => {
       fn(...args);
+      timeoutId = null;
     }, delayMs);
   };
 }
@@ -49,18 +49,31 @@ export function debounce<T extends (...args: any[]) => void>(
 /**
  * Splits an array into smaller chunks of a specified maximum size.
  */
-export function chunkArray<T>(items: T[], size: number): T[][] {
-  if (size <= 0) return [items];
-  const result: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    result.push(items.slice(i, i + size));
+export function chunkArray<T>(array: T[], size: number): T[][] {
+  if (size <= 0) {
+    throw new Error('Chunk size must be greater than zero');
   }
-  return result;
+
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+
+  return chunks;
 }
 
 /**
- * Pauses execution for a specified number of milliseconds.
+ * Extracts selected properties from an object into a new object.
  */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export function pick<T extends object, K extends keyof T>(
+  obj: T,
+  keys: K[]
+): Pick<T, K> {
+  const result = {} as Pick<T, K>;
+  for (const key of keys) {
+    if (key in obj) {
+      result[key] = obj[key];
+    }
+  }
+  return result;
 }
