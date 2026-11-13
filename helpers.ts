@@ -1,79 +1,33 @@
 /**
- * Common utility helper functions for data manipulation and function control.
+ * dev-toolkit-71 helper utility collection
  */
 
-/**
- * Creates a deep clone of a plain object, array, or Date instance.
- */
-export function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (obj instanceof Date) {
-    return new Date(obj.getTime()) as unknown as T;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => deepClone(item)) as unknown as T;
-  }
-
-  const clonedObj = {} as Record<string, unknown>;
-  for (const key of Object.keys(obj as Record<string, unknown>)) {
-    clonedObj[key] = deepClone((obj as Record<string, unknown>)[key]);
-  }
-
-  return clonedObj as T;
-}
-
-/**
- * Debounces a function call by waiting for a specified delay in milliseconds.
- */
-export function debounce<T extends (...args: any[]) => any>(
-  fn: T,
-  delayMs: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
+export const debounce = <T extends (...args: any[]) => void>(fn: T, ms: number) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
   return (...args: Parameters<T>) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      fn(...args);
-      timeoutId = null;
-    }, delayMs);
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), ms);
   };
-}
+};
 
-/**
- * Splits an array into smaller chunks of a specified maximum size.
- */
-export function chunkArray<T>(array: T[], size: number): T[][] {
-  if (size <= 0) {
-    throw new Error('Chunk size must be greater than zero');
-  }
+export const chunkArray = <T>(arr: T[], size: number): T[][] => {
+  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, i * size + size)
+  );
+};
 
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-
-  return chunks;
-}
-
-/**
- * Extracts selected properties from an object into a new object.
- */
-export function pick<T extends object, K extends keyof T>(
-  obj: T,
-  keys: K[]
-): Pick<T, K> {
+export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
   const result = {} as Pick<T, K>;
-  for (const key of keys) {
-    if (key in obj) {
-      result[key] = obj[key];
-    }
-  }
+  keys.forEach((key) => {
+    if (key in obj) result[key] = obj[key];
+  });
   return result;
-}
+};
+
+export const delay = (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+export const isNotEmpty = <T>(value: T | null | undefined): value is T => {
+  return value !== null && value !== undefined;
+};
