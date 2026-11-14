@@ -1,33 +1,42 @@
 /**
- * dev-toolkit-71 helper utility collection
+ * Utility functions for dev-toolkit-71
  */
 
-export const debounce = <T extends (...args: any[]) => void>(fn: T, ms: number) => {
+/**
+ * Debounces a function to limit execution rate
+ */
+export function debounce<T extends (...args: any[]) => void>(
+  fn: T,
+  delay: number
+): (...args: Parameters<T>) => void {
   let timeoutId: ReturnType<typeof setTimeout>;
   return (...args: Parameters<T>) => {
     clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), ms);
+    timeoutId = setTimeout(() => fn(...args), delay);
   };
-};
+}
 
-export const chunkArray = <T>(arr: T[], size: number): T[][] => {
-  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-    arr.slice(i * size, i * size + size)
-  );
-};
+/**
+ * Safely parses JSON with a default fallback
+ */
+export function safeJsonParse<T>(json: string, fallback: T): T {
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return fallback;
+  }
+}
 
-export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
-  const result = {} as Pick<T, K>;
-  keys.forEach((key) => {
-    if (key in obj) result[key] = obj[key];
-  });
-  return result;
-};
+/**
+ * Checks if a value is a non-null object
+ */
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-export const delay = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
-
-export const isNotEmpty = <T>(value: T | null | undefined): value is T => {
-  return value !== null && value !== undefined;
+/**
+ * Generates a unique string identifier
+ */
+export const generateId = (): string => {
+  return Math.random().toString(36).substring(2, 11);
 };
