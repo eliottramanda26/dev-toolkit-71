@@ -1,66 +1,49 @@
-export interface RawInput {
+export interface DataRecord {
   id: string;
-  payload: unknown;
-  retries?: number;
-}
-
-export interface ValidatedInput {
-  id: string;
+  timestamp: number;
   payload: Record<string, unknown>;
-  retries: number;
 }
 
-export class TaskProcessor {
-  /** Validates raw input structure before execution */
-  private validateInput(item: RawInput): ValidatedInput | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    if (typeof item.id !== 'string' || item.id.trim() === '') {
-      return null;
-    }
-
-    if (!item.payload || typeof item.payload !== 'object' || Array.isArray(item.payload)) {
-      return null;
-    }
-
-    const retries = typeof item.retries === 'number' && item.retries >= 0 ? item.retries : 0;
-
-    return {
-      id: item.id.trim(),
-      payload: item.payload as Record<string, unknown>,
-      retries,
-    };
+/**
+ * Normalizes input data into a consistent record structure
+ */
+export function normalizeData(raw: unknown): DataRecord {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error('Invalid input: data must be an object');
   }
 
-  /** Main loop processing incoming tasks with strict validation */
-  public async processBatch(items: RawInput[]): Promise<{ processed: number; failed: number }> {
-    let processed = 0;
-    let failed = 0;
+  const entry = raw as Record<string, unknown>;
 
-    for (const rawItem of items) {
-      // Validate input structure before execution
-      const validated = this.validateInput(rawItem);
-      if (!validated) {
-        failed++;
-        continue;
-      }
+  return {
+    id: (entry.id as string) || crypto.randomUUID(),
+    timestamp: typeof entry.timestamp === 'number' ? entry.timestamp : Date.now(),
+    payload: entry,
+  };
+}
 
-      try {
-        await this.executeTask(validated);
-        processed++;
-      } catch {
-        failed++;
-      }
-    }
-
-    return { processed, failed };
-  }
-
-  private async executeTask(item: ValidatedInput): Promise<void> {
-    if (Object.keys(item.payload).length === 0) {
-      throw new Error('Empty payload');
+/**
+ * Sanitizes data by stripping sensitive keys defined in an exclusion list
+ */
+export function sanitizeData(
+  data: Record<string, unknown>,
+  sensitiveKeys: string[] = ['password', 'token', 'secret']
+): Record<string, unknown> {
+  const cleaned = { ...data };
+  
+  for (const key of sensitiveKeys) {
+    if (key in cleaned) {
+      delete cleaned[key];
     }
   }
+
+  return cleaned;
+}
+
+/**
+ * Batches data items into chunks for efficient processing
+ */
+export function chunkData<T>(data: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(data.length / size) }, (_, i) =>
+    data.slice(i * size, i * size + size)
+  );
 }
