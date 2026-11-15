@@ -1,28 +1,49 @@
-export interface RetryOptions {
-  maxRetries?: number;
-  delayMs?: number;
+/**
+ * Core utility functions for dev-toolkit-71
+ * Provides memoization for expensive computational tasks
+ */
+
+export type MemoizedFunction<T extends (...args: any[]) => any> = (
+  ...args: Parameters<T>
+) => ReturnType<T>;
+
+/**
+ * Creates a memoized version of a function with simple LRU-like behavior
+ */
+export function memoize<T extends (...args: any[]) => any>(fn: T): MemoizedFunction<T> {
+  const cache = new Map<string, ReturnType<T>>();
+
+  return (...args: Parameters<T>): ReturnType<T> => {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) {
+      return cache.get(key) as ReturnType<T>;
+    }
+
+    const result = fn(...args);
+    cache.set(key, result);
+
+    // Prevent memory leaks by clearing cache if it grows too large
+    if (cache.size > 1000) {
+      cache.clear();
+    }
+
+    return result;
+  };
 }
 
 /**
- * Retries an asynchronous function with a fixed delay
+ * Debounce utility to limit frequency of execution
  */
-export async function withRetry<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = { maxRetries: 3, delayMs: 1000 }
-): Promise<T> {
-  const { maxRetries = 3, delayMs = 1000 } = options;
-  let lastError: unknown;
+export function debounce<T extends (...args: any[]) => void>(
+  fn: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (err) {
-      lastError = err;
-      if (attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
+  return (...args: Parameters<T>) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
     }
-  }
-
-  throw lastError;
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
 }
