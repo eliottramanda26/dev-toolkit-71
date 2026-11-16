@@ -1,49 +1,46 @@
 /**
- * Core utility functions for dev-toolkit-71
- * Provides memoization for expensive computational tasks
+ * general utility functions for dev-toolkit-71
  */
-
-export type MemoizedFunction<T extends (...args: any[]) => any> = (
-  ...args: Parameters<T>
-) => ReturnType<T>;
 
 /**
- * Creates a memoized version of a function with simple LRU-like behavior
+ * safely parses json strings with optional fallback value
  */
-export function memoize<T extends (...args: any[]) => any>(fn: T): MemoizedFunction<T> {
-  const cache = new Map<string, ReturnType<T>>();
-
-  return (...args: Parameters<T>): ReturnType<T> => {
-    const key = JSON.stringify(args);
-    if (cache.has(key)) {
-      return cache.get(key) as ReturnType<T>;
-    }
-
-    const result = fn(...args);
-    cache.set(key, result);
-
-    // Prevent memory leaks by clearing cache if it grows too large
-    if (cache.size > 1000) {
-      cache.clear();
-    }
-
-    return result;
-  };
+export function parseJson<T>(data: string, fallback: T): T {
+  try {
+    return JSON.parse(data) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 /**
- * Debounce utility to limit frequency of execution
+ * removes null or undefined values from objects
  */
-export function debounce<T extends (...args: any[]) => void>(
-  fn: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  return (...args: Parameters<T>) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+export function cleanObject<T extends Record<string, any>>(obj: T): Partial<T> {
+  return Object.entries(obj).reduce((acc, [key, value]) => {
+    if (value !== null && value !== undefined) {
+      acc[key as keyof T] = value;
     }
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
+    return acc;
+  }, {} as Partial<T>);
 }
+
+/**
+ * groups array items by a specific key
+ */
+export function groupBy<T>(arr: T[], key: keyof T): Record<string, T[]> {
+  return arr.reduce((acc, item) => {
+    const groupKey = String(item[key]);
+    if (!acc[groupKey]) {
+      acc[groupKey] = [];
+    }
+    acc[groupKey].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
+}
+
+/**
+ * delays execution for a specific duration
+ */
+export const sleep = (ms: number): Promise<void> => 
+  new Promise((resolve) => setTimeout(resolve, ms));
