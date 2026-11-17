@@ -1,46 +1,29 @@
 /**
- * general utility functions for dev-toolkit-71
+ * dev-toolkit-71 helper utilities
  */
 
-/**
- * safely parses json strings with optional fallback value
- */
-export function parseJson<T>(data: string, fallback: T): T {
-  try {
-    return JSON.parse(data) as T;
-  } catch {
-    return fallback;
-  }
-}
+export const debounce = <T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void => {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
 
-/**
- * removes null or undefined values from objects
- */
-export function cleanObject<T extends Record<string, any>>(obj: T): Partial<T> {
-  return Object.entries(obj).reduce((acc, [key, value]) => {
-    if (value !== null && value !== undefined) {
-      acc[key as keyof T] = value;
-    }
-    return acc;
-  }, {} as Partial<T>);
-}
+export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * groups array items by a specific key
- */
-export function groupBy<T>(arr: T[], key: keyof T): Record<string, T[]> {
-  return arr.reduce((acc, item) => {
-    const groupKey = String(item[key]);
-    if (!acc[groupKey]) {
-      acc[groupKey] = [];
-    }
-    acc[groupKey].push(item);
-    return acc;
-  }, {} as Record<string, T[]>);
-}
+export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
+  const result = {} as Pick<T, K>;
+  keys.forEach((key) => {
+    if (key in obj) result[key] = obj[key];
+  });
+  return result;
+};
 
-/**
- * delays execution for a specific duration
- */
-export const sleep = (ms: number): Promise<void> => 
-  new Promise((resolve) => setTimeout(resolve, ms));
+export const isDefined = <T>(value: T | null | undefined): value is T => {
+  return value !== null && value !== undefined;
+};
+
+export const getErrorMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error);
+};
