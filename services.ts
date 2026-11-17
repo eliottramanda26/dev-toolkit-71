@@ -1,49 +1,48 @@
 export interface DataRecord {
   id: string;
+  value: unknown;
   timestamp: number;
-  payload: Record<string, unknown>;
 }
 
 /**
- * Normalizes input data into a consistent record structure
+ * Safely parses and validates incoming data records
  */
-export function normalizeData(raw: unknown): DataRecord {
-  if (typeof raw !== 'object' || raw === null) {
-    throw new Error('Invalid input: data must be an object');
+export function sanitizeRecord(data: unknown): DataRecord | null {
+  if (!data || typeof data !== 'object') {
+    return null;
   }
 
-  const entry = raw as Record<string, unknown>;
+  const record = data as Record<string, unknown>;
+
+  if (typeof record.id !== 'string') {
+    return null;
+  }
 
   return {
-    id: (entry.id as string) || crypto.randomUUID(),
-    timestamp: typeof entry.timestamp === 'number' ? entry.timestamp : Date.now(),
-    payload: entry,
+    id: record.id,
+    value: record.value ?? null,
+    timestamp: typeof record.timestamp === 'number' ? record.timestamp : Date.now(),
   };
 }
 
 /**
- * Sanitizes data by stripping sensitive keys defined in an exclusion list
+ * Groups an array of records by a specific key prefix
  */
-export function sanitizeData(
-  data: Record<string, unknown>,
-  sensitiveKeys: string[] = ['password', 'token', 'secret']
-): Record<string, unknown> {
-  const cleaned = { ...data };
-  
-  for (const key of sensitiveKeys) {
-    if (key in cleaned) {
-      delete cleaned[key];
+export function groupRecordsById(records: DataRecord[]): Record<string, DataRecord[]> {
+  return records.reduce((acc, record) => {
+    const prefix = record.id.split('-')[0] || 'unknown';
+    if (!acc[prefix]) {
+      acc[prefix] = [];
     }
-  }
-
-  return cleaned;
+    acc[prefix].push(record);
+    return acc;
+  }, {} as Record<string, DataRecord[]>);
 }
 
 /**
- * Batches data items into chunks for efficient processing
+ * Filters out expired records based on threshold
  */
-export function chunkData<T>(data: T[], size: number): T[][] {
-  return Array.from({ length: Math.ceil(data.length / size) }, (_, i) =>
-    data.slice(i * size, i * size + size)
-  );
+export function filterActiveRecords(records: DataRecord[], ttlMs: number): DataRecord[] {
+  const now = Date.now();
+  return records.filter((r) => now - r.timestamp < ttlMs);
 }
