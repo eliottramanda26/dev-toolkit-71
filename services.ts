@@ -1,48 +1,36 @@
-export interface DataRecord {
-  id: string;
-  value: unknown;
-  timestamp: number;
+interface ServiceResult<T> {
+  data: T | null;
+  error: string | null;
 }
 
 /**
- * Safely parses and validates incoming data records
+ * generic service wrapper for robust api requests
  */
-export function sanitizeRecord(data: unknown): DataRecord | null {
-  if (!data || typeof data !== 'object') {
-    return null;
-  }
-
-  const record = data as Record<string, unknown>;
-
-  if (typeof record.id !== 'string') {
-    return null;
-  }
-
-  return {
-    id: record.id,
-    value: record.value ?? null,
-    timestamp: typeof record.timestamp === 'number' ? record.timestamp : Date.now(),
-  };
-}
-
-/**
- * Groups an array of records by a specific key prefix
- */
-export function groupRecordsById(records: DataRecord[]): Record<string, DataRecord[]> {
-  return records.reduce((acc, record) => {
-    const prefix = record.id.split('-')[0] || 'unknown';
-    if (!acc[prefix]) {
-      acc[prefix] = [];
+export async function executeSafeRequest<T>(fetcher: () => Promise<T>): Promise<ServiceResult<T>> {
+  try {
+    const response = await fetcher();
+    return { data: response, error: null };
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'unknown service failure';
+    console.error(`[dev-toolkit-71] service error: ${errorMessage}`);
+    
+    // handling edge cases like network timeouts or auth rejection
+    if (errorMessage.includes('401')) {
+      return { data: null, error: 'authentication required' };
     }
-    acc[prefix].push(record);
-    return acc;
-  }, {} as Record<string, DataRecord[]>);
+    
+    return { data: null, error: errorMessage };
+  }
 }
 
-/**
- * Filters out expired records based on threshold
- */
-export function filterActiveRecords(records: DataRecord[], ttlMs: number): DataRecord[] {
-  const now = Date.now();
-  return records.filter((r) => now - r.timestamp < ttlMs);
-}
+export const fetchData = async <T>(url: string): Promise<ServiceResult<T>> => {
+  return await executeSafeRequest(async () => {
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`request failed with status ${response.status}`);
+    }
+    
+    return response.json() as Promise<T>;
+  });
+};
