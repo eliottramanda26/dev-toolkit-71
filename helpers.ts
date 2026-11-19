@@ -1,29 +1,35 @@
+import { createLogger, format, transports, Logger } from 'winston';
+import 'winston-daily-rotate-file';
+
 /**
- * dev-toolkit-71 helper utilities
+ * initializes a logger instance with daily rotation
  */
-
-export const debounce = <T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void => {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  return (...args: Parameters<T>) => {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-};
-
-export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
-  const result = {} as Pick<T, K>;
-  keys.forEach((key) => {
-    if (key in obj) result[key] = obj[key];
+export const getLogger = (serviceName: string): Logger => {
+  const transport = new transports.DailyRotateFile({
+    filename: `logs/${serviceName}-%DATE%.log`,
+    datePattern: 'YYYY-MM-DD',
+    zippedArchive: true,
+    maxSize: '20m',
+    maxFiles: '14d'
   });
-  return result;
+
+  return createLogger({
+    level: 'info',
+    format: format.combine(
+      format.timestamp(),
+      format.json()
+    ),
+    transports: [
+      transport,
+      new transports.Console({
+        format: format.combine(
+          format.colorize(),
+          format.simple()
+        )
+      })
+    ]
+  });
 };
 
-export const isDefined = <T>(value: T | null | undefined): value is T => {
-  return value !== null && value !== undefined;
-};
-
-export const getErrorMessage = (error: unknown): string => {
-  return error instanceof Error ? error.message : String(error);
-};
+// example usage: const logger = getLogger('dev-toolkit-71');
+export const logger = getLogger('app');
