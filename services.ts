@@ -1,36 +1,43 @@
-interface ServiceResult<T> {
-  data: T | null;
-  error: string | null;
+interface CacheEntry<T> {
+  data: T;
+  expiry: number;
 }
 
 /**
- * generic service wrapper for robust api requests
+ * Memoized service layer for data fetching
+ * Reduces redundant I/O operations
  */
-export async function executeSafeRequest<T>(fetcher: () => Promise<T>): Promise<ServiceResult<T>> {
-  try {
-    const response = await fetcher();
-    return { data: response, error: null };
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'unknown service failure';
-    console.error(`[dev-toolkit-71] service error: ${errorMessage}`);
-    
-    // handling edge cases like network timeouts or auth rejection
-    if (errorMessage.includes('401')) {
-      return { data: null, error: 'authentication required' };
+class DataService {
+  private cache: Map<string, CacheEntry<any>> = new Map();
+  private readonly TTL_MS = 60000;
+
+  public async fetchData<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    const cached = this.cache.get(key);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.data;
     }
-    
-    return { data: null, error: errorMessage };
+
+    const data = await fetcher();
+    this.cache.set(key, {
+      data,
+      expiry: Date.now() + this.TTL_MS,
+    });
+
+    return data;
+  }
+
+  public clearCache(): void {
+    this.cache.clear();
+  }
+
+  public pruneExpired(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.expiry < now) {
+        this.cache.delete(key);
+      }
+    }
   }
 }
 
-export const fetchData = async <T>(url: string): Promise<ServiceResult<T>> => {
-  return await executeSafeRequest(async () => {
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`request failed with status ${response.status}`);
-    }
-    
-    return response.json() as Promise<T>;
-  });
-};
+export const coreService = new DataService();
