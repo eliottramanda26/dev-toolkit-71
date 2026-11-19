@@ -1,48 +1,42 @@
 # dev-toolkit-71
 
-`dev-toolkit-71` is a robust collection of TypeScript-based utility functions designed to streamline repetitive development tasks in modern Node.js environments. This toolkit focuses on type-safety and performance to ensure reliable data manipulation and environment configuration across your projects.
+`dev-toolkit-71` is a robust collection of TypeScript-based utility functions designed to streamline daily development workflows. It eliminates boilerplate code by providing optimized, type-safe helpers for common formatting, validation, and object manipulation tasks.
 
 ## Features
 
-*   **Type-Safe Environment Parsing**: Effortlessly validate and cast `.env` variables with strict interface definitions.
-*   **Object Transformation Suite**: High-performance utilities for deep-merging, pruning, and flattening complex configuration objects.
-*   **Async Queue Management**: A lightweight concurrency-limited execution engine for batching API requests.
-*   **Zero-Dependency Core**: Built with minimal overhead, ensuring your dependency tree remains slim and secure.
+*   **Type-Safe Object Diffing:** Generate precise recursive differences between two objects with full TypeScript inference.
+*   **Performance-Optimized Debouncer:** A high-precision debounce utility supporting immediate execution and trailing edge cancellation.
+*   **Schema-Agnostic Sanitizers:** Rapidly strip sensitive keys or sanitize complex nested data structures without schema definition.
+*   **Fluent Path Utilities:** Simplify filesystem path generation and normalization across cross-platform environments.
 
 ## Installation
 
-Install the toolkit via your preferred package manager:
+Install the package via npm or yarn:
 
 ```bash
-# Using npm
 npm install dev-toolkit-71
-
-# Using yarn
+# or
 yarn add dev-toolkit-71
-
-# Using pnpm
-pnpm add dev-toolkit-71
 ```
 
 ## Usage
 
-Import the desired utilities directly into your TypeScript source files. The library is fully tree-shakable.
+Import the utilities directly into your TypeScript project:
 
 ```typescript
-import { env, objectUtils } from 'dev-toolkit-71';
+import { debounce, diffObjects } from 'dev-toolkit-71';
 
-// Validate environment variables
-const config = env.parse({
-  PORT: env.number(),
-  API_KEY: env.string()
-});
+// Example: Debouncing a search input handler
+const handleSearch = debounce((query: string) => {
+  console.log('Searching for:', query);
+}, 300);
 
-// Deep merge utility example
-const defaultConfig = { theme: 'dark', retry: 3 };
-const userConfig = { theme: 'light' };
+// Example: Finding changes in state
+const oldState = { id: 1, name: 'Alice' };
+const newState = { id: 1, name: 'Bob' };
+const changes = diffObjects(oldState, newState);
 
-const finalConfig = objectUtils.deepMerge(defaultConfig, userConfig);
-console.log(finalConfig); // { theme: 'light', retry: 3 }
+console.log(changes); // { name: 'Bob' }
 ```
 
 ## License
