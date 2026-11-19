@@ -4,7 +4,7 @@ export interface RetryOptions {
 }
 
 /**
- * Executes a function with exponential backoff retry logic.
+ * Executes a network operation with exponential backoff retry logic.
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
@@ -17,6 +17,7 @@ export async function withRetry<T>(
       return await operation();
     } catch (err) {
       lastError = err;
+
       if (attempt < options.maxAttempts) {
         const backoff = options.delayMs * Math.pow(2, attempt - 1);
         await new Promise((resolve) => setTimeout(resolve, backoff));
@@ -24,5 +25,5 @@ export async function withRetry<T>(
     }
   }
 
-  throw lastError;
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
