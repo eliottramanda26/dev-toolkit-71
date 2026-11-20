@@ -1,33 +1,29 @@
+/**
+ * Core interface definitions for dev-toolkit-71
+ */
+
 export interface ToolConfig {
   name: string;
   version: string;
-  environment: 'development' | 'production' | 'staging';
+  enabled: boolean;
 }
 
-export interface TaskMetadata {
-  id: string;
-  priority: 1 | 2 | 3;
-  tags: string[];
-}
-
-export type ProcessResult<T> = {
-  data: T;
-  error: Error | null;
+export interface ExecutionContext {
   timestamp: number;
-};
-
-export interface ToolkitManifest {
-  config: ToolConfig;
-  tasks: TaskMetadata[];
-  lastUpdated: Date;
+  environment: 'development' | 'production';
+  debug: boolean;
 }
 
-export const createManifest = (name: string): ToolkitManifest => ({
-  config: {
-    name,
-    version: '1.0.0',
-    environment: 'development',
-  },
-  tasks: [],
-  lastUpdated: new Date(),
-});
+export interface TaskResult<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export type LoggerLevel = 'info' | 'warn' | 'error';
+
+export interface LogEntry {
+  level: LoggerLevel;
+  message: string;
+  metadata?: Record<string, unknown>;
+}
