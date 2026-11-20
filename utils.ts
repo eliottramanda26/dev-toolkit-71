@@ -1,54 +1,44 @@
 /**
- * Formats a string to PascalCase for component naming
- * @param input - The raw string input
- * @returns The PascalCase formatted string
+ * Utility functions for dev-toolkit-71
  */
-export const toPascalCase = (input: string): string => {
-  return input
-    .replace(/(\w)(\w*)/g, (g0, g1, g2) => g1.toUpperCase() + g2.toLowerCase())
-    .replace(/[^a-zA-Z0-9]/g, '');
+
+export interface ProcessResult {
+  success: boolean;
+  timestamp: number;
+  data?: unknown;
+}
+
+/**
+ * Sanitizes input data strings
+ */
+export const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/[^a-zA-Z0-9]/g, '');
 };
 
 /**
- * Safely parses a JSON string with a fallback value
- * @param jsonString - The raw string to parse
- * @param fallback - The default value if parsing fails
- * @returns The parsed object or fallback
+ * Generates a standard process result object
  */
-export function safeParse<T>(jsonString: string, fallback: T): T {
-  try {
-    return JSON.parse(jsonString) as T;
-  } catch (err) {
-    return fallback;
-  }
-}
+export const createResult = (success: boolean, data?: unknown): ProcessResult => ({
+  success,
+  timestamp: Date.now(),
+  data
+});
 
 /**
- * Configuration for retry operations
+ * Formats toolkit output for standard console logging
  */
-export interface RetryOptions {
-  attempts: number;
-  delayMs: number;
-}
+export const formatOutput = (prefix: string, message: string): string => {
+  const timestamp = new Date().toISOString();
+  return `[${timestamp}] [${prefix.toUpperCase()}]: ${message}`;
+};
 
 /**
- * Executes a function with simple retry logic
- * @param fn - The function to execute
- * @param options - Attempt and delay configuration
+ * Chunk array for batch processing operations
  */
-export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> {
-  let lastError: unknown;
-
-  for (let i = 0; i < options.attempts; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      if (i < options.attempts - 1) {
-        await new Promise((res) => setTimeout(res, options.delayMs));
-      }
-    }
+export function chunkArray<T>(array: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
   }
-
-  throw lastError;
+  return result;
 }
